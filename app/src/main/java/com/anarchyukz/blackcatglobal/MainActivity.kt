@@ -277,6 +277,33 @@ private fun loadDashboard(context: android.content.Context): DashboardData {
     var previousFixture = prefs.getString("previous_fixture", null)
     var previousKickoff = prefs.getString("previous_kickoff_label", null)
     val now = System.currentTimeMillis()
+
+    // Also look for a past Sunderland fixture in the pages on first launch,
+    // so the previous-match section does not depend on the app having been open before.
+    val pastFixtures = docs.flatMap { (_, doc) ->
+        doc.select("a").mapNotNull { anchor ->
+            val title = anchor.text().replace(Regex("\\s+"), " ").trim()
+            if (title.length !in 8..100 ||
+                !title.contains("Sunderland", ignoreCase = true) ||
+                !Regex("(?i)\\b(vs?\\.?|versus)\\b").containsMatchIn(title)) {
+                return@mapNotNull null
+            }
+            val nearby = findFixtureContainer(anchor)?.text()?.replace(Regex("\\s+"), " ").orEmpty()
+            val dateLabel = extractKickoff(nearby) ?: return@mapNotNull null
+            val dateMillis = parseKickoffMillis(dateLabel) ?: return@mapNotNull null
+            if (dateMillis >= now - 90L * 60L * 1000L) return@mapNotNull null
+            Triple(title, dateLabel, dateMillis)
+        }
+    }.distinctBy { it.first.lowercase() }
+    val newestPast = pastFixtures.maxByOrNull { it.third }
+    if (newestPast != null &&
+        (previousFixture.isNullOrBlank() ||
+            (parseKickoffMillis(previousKickoff.orEmpty()) ?: 0L) < newestPast.third)) {
+        previousFixture = newestPast.first
+        previousKickoff = newestPast.second
+        prefs.edit().putString("previous_fixture", previousFixture)
+            .putString("previous_kickoff_label", previousKickoff).apply()
+    }
     val pinnedFixture = prefs.getString("pinned_fixture", null)
     val pinnedKickoff = prefs.getLong("pinned_kickoff", 0L)
     val pinnedUntil = pinnedKickoff + 90L * 60L * 1000L
