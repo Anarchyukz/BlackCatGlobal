@@ -69,6 +69,8 @@ private data class WebResult(val title: String, val snippet: String, val source:
 private data class DashboardData(
     val fixture: String?,
     val kickoff: String?,
+    val previousFixture: String?,
+    val previousKickoff: String?,
     val fixtureSource: String,
     val guides: List<GuideResult>,
     val searchResults: List<WebResult>,
@@ -182,6 +184,20 @@ private fun BlackCatApp() {
                 }
             }
             Spacer(Modifier.height(24.dp))
+            data?.previousFixture?.let { previous ->
+                Spacer(Modifier.height(20.dp))
+                Text("PREVIOUS MATCH", fontSize = 11.sp, color = Muted,
+                    fontWeight = FontWeight.ExtraBold, letterSpacing = 2.sp)
+                Spacer(Modifier.height(7.dp))
+                Text(previous, fontSize = 16.sp, fontWeight = FontWeight.Bold,
+                    color = Color.White,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+                data.previousKickoff?.let { previousTime ->
+                    Spacer(Modifier.height(4.dp))
+                    Text(previousTime, color = Muted, fontSize = 12.sp)
+                }
+            }
+            Spacer(Modifier.height(12.dp))
             Text("Listings refresh automatically", color = Muted, fontSize = 12.sp)
         }
     }
@@ -258,6 +274,8 @@ private fun loadDashboard(context: android.content.Context): DashboardData {
     // Keep the selected fixture pinned from kick-off until the end of its 90-minute window.
     // This prevents guide pages rolling forward to the next fixture while the game is in progress.
     val prefs = context.getSharedPreferences("black_cat_global", android.content.Context.MODE_PRIVATE)
+    var previousFixture = prefs.getString("previous_fixture", null)
+    var previousKickoff = prefs.getString("previous_kickoff_label", null)
     val now = System.currentTimeMillis()
     val pinnedFixture = prefs.getString("pinned_fixture", null)
     val pinnedKickoff = prefs.getLong("pinned_kickoff", 0L)
@@ -272,7 +290,12 @@ private fun loadDashboard(context: android.content.Context): DashboardData {
     } else {
         // The previous match's 90-minute window has ended: clear it before selecting the next fixture.
         if (pinnedKickoff > 0L && now >= pinnedUntil) {
-            prefs.edit().remove("pinned_fixture").remove("pinned_kickoff")
+            previousFixture = pinnedFixture ?: previousFixture
+            previousKickoff = prefs.getString("pinned_kickoff_label", previousKickoff)
+            prefs.edit()
+                .putString("previous_fixture", previousFixture)
+                .putString("previous_kickoff_label", previousKickoff)
+                .remove("pinned_fixture").remove("pinned_kickoff")
                 .remove("pinned_kickoff_label").apply()
         }
 
@@ -291,6 +314,8 @@ private fun loadDashboard(context: android.content.Context): DashboardData {
     return DashboardData(
         fixture = fixture,
         kickoff = kickoff,
+        previousFixture = previousFixture,
+        previousKickoff = previousKickoff,
         fixtureSource = fixtureSource,
         guides = guides,
         searchResults = searchResults,
