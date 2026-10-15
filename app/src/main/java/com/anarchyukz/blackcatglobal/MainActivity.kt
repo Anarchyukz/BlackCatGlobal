@@ -86,7 +86,8 @@ private val broadcasterTerms = listOf(
 private val guidePages = listOf(
     "TV Guide UK" to "https://www.tvguide.co.uk/sport/football/sunderland",
     "Where's The Match" to "https://www.wheresthematch.com/Football/Sunderland.asp",
-    "Live Soccer TV" to "https://www.livesoccertv.com/teams/england/sunderland/"
+    "Live Soccer TV" to "https://www.livesoccertv.com/teams/england/sunderland/",
+    "FourFourTwo" to "https://www.fourfourtwo.com/features"
 )
 
 class MainActivity : ComponentActivity() {
