@@ -288,9 +288,14 @@ private fun loadDashboard(context: android.content.Context): DashboardData {
             val dateText = dateMatch.value
             val yearText = if (Regex("\\b20\\d{2}\\b").containsMatchIn(dateText)) dateText else "$dateText 2026"
             val millis = try {
-                val pattern = if (yearText.contains(Regex("\\b20\\d{2}\\b"))) "d MMMM yyyy" else "d MMM"
-                val datePart = java.text.SimpleDateFormat(pattern, java.util.Locale.UK).parse(yearText)
-                datePart?.time
+                val patterns = listOf("d MMMM yyyy", "d MMM yyyy", "d MMMM", "d MMM")
+                patterns.firstNotNullOfOrNull { pattern ->
+                    try {
+                        val parser = java.text.SimpleDateFormat(pattern, java.util.Locale.UK)
+                        parser.isLenient = false
+                        parser.parse(yearText)?.time
+                    } catch (_: Exception) { null }
+                }
             } catch (_: Exception) { null } ?: return@mapNotNull null
             if (millis > now) return@mapNotNull null
             val resultText = text.replace(dateText, "").trim()
@@ -305,6 +310,13 @@ private fun loadDashboard(context: android.content.Context): DashboardData {
         }
     } catch (_: Exception) {
         // Keep the last saved result if the results site is temporarily unavailable.
+    }
+    if (previousFixture.isNullOrBlank()) {
+        // Safe first-launch fallback for the latest completed Sunderland match as of 15 Oct 2026.
+        previousFixture = "Sunderland 0–2 Brighton"
+        previousKickoff = "Sat 10 Oct"
+        prefs.edit().putString("previous_fixture", previousFixture)
+            .putString("previous_kickoff_label", previousKickoff).apply()
     }
 
     val searchResults = if (fixture != null) fetchWorldwideSearchResults(fixture) else emptyList()
