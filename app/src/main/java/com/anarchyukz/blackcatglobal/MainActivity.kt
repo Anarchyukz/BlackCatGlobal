@@ -80,7 +80,7 @@ private val broadcasterTerms = listOf(
     "Stan Sport", "SuperSport", "Disney+", "Peacock", "NBC", "USA Network", "Canal+",
     "Setanta Sports", "Paramount+", "JioHotstar", "Star Sports", "Viaplay", "Amazon Prime",
     "Prime Video", "Apple TV", "Fubo", "Sport TV", "Ziggo Sport", "Eleven Sports",
-    "Movistar", "Arena Sport", "DStv", "TOD", "LFCTV"
+    "Movistar", "Arena Sport", "DStv", "TOD", "LFCTV", "NOW", "NOW TV", "HBO MAX", "Sky Sports+"
 )
 
 private val guidePages = listOf(
@@ -305,11 +305,13 @@ private fun findFixtureContainer(anchor: org.jsoup.nodes.Element): org.jsoup.nod
 
 private fun extractFixtureFromText(text: String): String? {
     val clean = text.replace(Regex("\\s+"), " ")
-    val patterns = listOf(
-        Regex("(?i)([A-Za-z][A-Za-z .&'-]{1,45}\\s+(?:vs?\\.?|versus)\\s+Sunderland)"),
-        Regex("(?i)(Sunderland\\s+(?:vs?\\.?|versus)\\s+[A-Za-z][A-Za-z .&'-]{1,45})")
-    )
-    return patterns.firstNotNullOfOrNull { regex -> regex.find(clean)?.groupValues?.getOrNull(1)?.trim() }
+    val awayPattern = Regex("(?i)([A-Za-z][A-Za-z .&'-]{1,45}?)(?:\\s*vs?\\.?\\s*|\\s+versus\\s*)(Sunderland)")
+    val homePattern = Regex("(?i)(Sunderland)(?:\\s*vs?\\.?\\s*|\\s+versus\\s*)([A-Za-z][A-Za-z .&'-]{1,45}?)")
+    val away = awayPattern.find(clean)
+    if (away != null) return "${away.groupValues[1].trim()} vs ${away.groupValues[2].trim()}"
+    val home = homePattern.find(clean)
+    if (home != null) return "${home.groupValues[1].trim()} vs ${home.groupValues[2].trim()}"
+    return null
 }
 
 private fun extractKickoff(text: String): String? {
