@@ -109,113 +109,84 @@ class MainActivity : ComponentActivity() {
 @Composable
 private fun BlackCatApp() {
     val context = LocalContext.current
-    var refreshKey by remember { mutableIntStateOf(0) }
-    var loading by remember { mutableStateOf(false) }
+    var loading by remember { mutableStateOf(true) }
     var dashboard by remember { mutableStateOf<DashboardData?>(null) }
 
-    LaunchedEffect(refreshKey) {
-        loading = true
-        dashboard = withContext(Dispatchers.IO) { loadDashboard() }
-        loading = false
+    LaunchedEffect(Unit) {
+        while (true) {
+            loading = true
+            dashboard = withContext(Dispatchers.IO) { loadDashboard(context) }
+            loading = false
+            kotlinx.coroutines.delay(60_000L)
+        }
+    }
+
+    val data = dashboard
+    val channels = remember(data) {
+        (data?.guides.orEmpty().flatMap { it.channels } +
+            data?.searchResults.orEmpty().flatMap { it.channels })
+            .map { it.trim() }
+            .filter { it.isNotBlank() }
+            .distinctBy { it.lowercase() }
     }
 
     Surface(modifier = Modifier.fillMaxSize(), color = DeepBackground) {
         Column(
-            modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())
-                .padding(horizontal = 18.dp, vertical = 18.dp),
-            verticalArrangement = Arrangement.spacedBy(15.dp)
+            modifier = Modifier.fillMaxSize().padding(horizontal = 22.dp, vertical = 30.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(
-                    modifier = Modifier.background(CatRed, RoundedCornerShape(15.dp)).padding(13.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(Icons.Default.SportsSoccer, contentDescription = null, tint = Color.White)
-                }
-                Spacer(Modifier.width(12.dp))
-                Column {
-                    Text("BLACK CAT", fontSize = 23.sp, fontWeight = FontWeight.Black, color = Color.White, letterSpacing = 1.2.sp)
-                    Text("GLOBAL", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = CatRed, letterSpacing = 4.sp)
-                }
-                Spacer(Modifier.weight(1f))
-                Icon(Icons.Default.Public, contentDescription = "Worldwide", tint = CatRed)
+            Box(
+                modifier = Modifier.background(CatRed, RoundedCornerShape(22.dp)).padding(17.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(Icons.Default.SportsSoccer, contentDescription = null, tint = Color.White,
+                    modifier = Modifier.width(34.dp).height(34.dp))
             }
+            Spacer(Modifier.height(16.dp))
+            Text("BLACK CAT GLOBAL", fontSize = 23.sp, fontWeight = FontWeight.Black,
+                color = Color.White, letterSpacing = 1.2.sp)
+            Spacer(Modifier.height(32.dp))
 
-            Card(colors = CardDefaults.cardColors(containerColor = Panel), shape = RoundedCornerShape(20.dp)) {
-                Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text("Sunderland's next game", fontSize = 21.sp, fontWeight = FontWeight.Bold)
-                    Text("Fixtures and TV listings are checked from public football guides. No fixture details to enter.", color = Muted, fontSize = 13.sp)
-                    if (loading) {
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                            CircularProgressIndicator(color = CatRed, modifier = Modifier.width(22.dp).height(22.dp), strokeWidth = 2.dp)
-                            Text("Checking fixture and TV guides…", color = Muted)
-                        }
-                    } else {
-                        val data = dashboard
-                        Text(data?.fixture ?: "Fixture not available right now", fontSize = 23.sp, fontWeight = FontWeight.ExtraBold)
-                        data?.kickoff?.let { Text(it, color = CatRed, fontWeight = FontWeight.Bold, fontSize = 15.sp) }
-                        Text("Fixture source: " + (data?.fixtureSource ?: "Sunderland AFC / football guides"), color = Muted, fontSize = 12.sp)
-                    }
-                    Button(
-                        onClick = { refreshKey++ },
-                        enabled = !loading,
-                        modifier = Modifier.fillMaxWidth().height(48.dp),
-                        shape = RoundedCornerShape(13.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = CatRed)
-                    ) {
-                        Icon(Icons.Default.Refresh, contentDescription = null)
-                        Spacer(Modifier.width(8.dp))
-                        Text("REFRESH FIXTURE & CHANNELS", fontWeight = FontWeight.Bold)
-                    }
+            if (loading && data == null) {
+                CircularProgressIndicator(color = CatRed)
+                Spacer(Modifier.height(16.dp))
+                Text("Finding the next Sunderland match…", color = Muted, fontSize = 15.sp)
+            } else {
+                Text("SUNDERLAND", fontSize = 12.sp, color = CatRed,
+                    fontWeight = FontWeight.ExtraBold, letterSpacing = 2.4.sp)
+                Spacer(Modifier.height(12.dp))
+                Text(data?.fixture ?: "Fixture unavailable",
+                    fontSize = 27.sp, fontWeight = FontWeight.ExtraBold,
+                    color = Color.White, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+                data?.kickoff?.let {
+                    Spacer(Modifier.height(9.dp))
+                    Text(it, color = Muted, fontSize = 14.sp)
                 }
-            }
-
-            Text("TV CHANNELS & WORLDWIDE GUIDES", fontSize = 13.sp, color = CatRed, fontWeight = FontWeight.ExtraBold, letterSpacing = 1.2.sp)
-            Text("Listings are taken from public guide pages where available. Broadcasters can vary by country and some matches are not televised in every territory.", color = Muted, fontSize = 13.sp)
-
-            val results = dashboard?.guides.orEmpty()
-            if (!loading && results.isEmpty()) {
-                Text("No guide results could be read just now. Open a guide below to check its latest listing.", color = Muted, fontSize = 14.sp)
-            }
-            results.forEach { result ->
-                Card(colors = CardDefaults.cardColors(containerColor = Panel), shape = RoundedCornerShape(16.dp)) {
-                    Column(Modifier.fillMaxWidth().padding(15.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
-                        Text(result.name, fontSize = 16.sp, fontWeight = FontWeight.Bold)
-                        if (result.fixture != null) Text(result.fixture, fontWeight = FontWeight.SemiBold)
-                        if (!result.channels.isNullOrEmpty()) {
-                            Text("Channels found: " + result.channels.joinToString(", "), color = Color.White, fontSize = 14.sp)
-                        } else {
-                            Text(result.context ?: "No channel name could be extracted from this guide's public listing.", color = Muted, fontSize = 13.sp)
-                        }
-                    }
+                Spacer(Modifier.height(30.dp))
+                Text("WATCH ON", fontSize = 12.sp, color = CatRed,
+                    fontWeight = FontWeight.ExtraBold, letterSpacing = 2.4.sp)
+                Spacer(Modifier.height(12.dp))
+                if (channels.isEmpty()) {
+                    Text(
+                        if (loading) "Checking worldwide TV listings…" else "TV channels not confirmed yet",
+                        color = Muted, fontSize = 16.sp,
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                    )
+                } else {
+                    Text(channels.joinToString("  •  "), color = Color.White,
+                        fontSize = 20.sp, fontWeight = FontWeight.Bold,
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                        lineHeight = 29.sp)
                 }
             }
-
-            Text("WORLDWIDE SEARCH RESULTS", fontSize = 13.sp, color = CatRed, fontWeight = FontWeight.ExtraBold, letterSpacing = 1.2.sp)
-            Text("Search summaries are shown here in the app. You do not need to open each TV guide.", color = Muted, fontSize = 13.sp)
-            val searchResults = dashboard?.searchResults.orEmpty()
-            if (!loading && searchResults.isEmpty()) {
-                Text("No worldwide search summaries were available. Try refreshing; some search providers limit automated requests.", color = Muted, fontSize = 13.sp)
-            }
-            searchResults.forEach { item ->
-                Card(colors = CardDefaults.cardColors(containerColor = Panel), shape = RoundedCornerShape(14.dp)) {
-                    Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Text(item.title, fontWeight = FontWeight.Bold, fontSize = 15.sp)
-                        if (item.channels.isNotEmpty()) {
-                            Text("Possible broadcaster(s): " + item.channels.joinToString(", "), color = CatRed, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
-                        }
-                        Text(item.snippet, color = Muted, fontSize = 13.sp)
-                        Text("Source: " + item.source, color = Muted, fontSize = 11.sp)
-                    }
-                }
-            }
-
-            Text("Legal viewing information only • No streams hosted • No background polling", color = Muted, fontSize = 11.sp, modifier = Modifier.padding(bottom = 12.dp))
+            Spacer(Modifier.height(24.dp))
+            Text("Listings refresh automatically", color = Muted, fontSize = 12.sp)
         }
     }
 }
 
-private fun loadDashboard(): DashboardData {
+private fun loadDashboard(context: android.content.Context): DashboardData {
     val errors = mutableListOf<String>()
     val docs = guidePages.mapNotNull { (name, url) ->
         try {
@@ -282,6 +253,32 @@ private fun loadDashboard(): DashboardData {
     }
 
     val searchResults = if (fixture != null) fetchWorldwideSearchResults(fixture) else emptyList()
+
+    // Keep the selected fixture pinned from kick-off until the end of its 90-minute window.
+    // This prevents guide pages rolling forward to the next fixture while the game is in progress.
+    val prefs = context.getSharedPreferences("black_cat_global", android.content.Context.MODE_PRIVATE)
+    val now = System.currentTimeMillis()
+    val pinnedFixture = prefs.getString("pinned_fixture", null)
+    val pinnedKickoff = prefs.getLong("pinned_kickoff", 0L)
+    val pinnedUntil = pinnedKickoff + 90L * 60L * 1000L
+    if (!pinnedFixture.isNullOrBlank() && pinnedKickoff > 0L && now in pinnedKickoff until pinnedUntil) {
+        fixture = pinnedFixture
+        kickoff = prefs.getString("pinned_kickoff_label", kickoff)
+        fixtureSource = "Pinned for match duration"
+    } else {
+        val parsedKickoff = kickoff?.let { parseKickoffMillis(it) }
+        if (!fixture.isNullOrBlank() && parsedKickoff != null && parsedKickoff > now &&
+            parsedKickoff - now <= 7L * 24L * 60L * 60L * 1000L) {
+            prefs.edit()
+                .putString("pinned_fixture", fixture)
+                .putLong("pinned_kickoff", parsedKickoff)
+                .putString("pinned_kickoff_label", kickoff)
+                .apply()
+        } else if (pinnedKickoff > 0L && now >= pinnedUntil) {
+            prefs.edit().remove("pinned_fixture").remove("pinned_kickoff")
+                .remove("pinned_kickoff_label").apply()
+        }
+    }
 
     return DashboardData(
         fixture = fixture,
@@ -359,6 +356,30 @@ private fun extractKickoff(text: String): String? {
     val date = Regex("(?i)\\b(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)(?:day)?\\s+\\d{1,2}\\s+[A-Za-z]{3,9}\\b").find(clean)?.value
     val time = Regex("\\b(?:[01]?\\d|2[0-3]):[0-5]\\d\\b").find(clean)?.value
     return listOfNotNull(date, time).joinToString(" • ").ifBlank { "" }.takeIf { it.isNotBlank() }
+}
+
+private fun parseKickoffMillis(label: String): Long? {
+    val patterns = listOf(
+        "EEE d MMM • HH:mm", "EEEE d MMMM • HH:mm",
+        "EEE d MMM HH:mm", "EEEE d MMMM HH:mm",
+        "d MMM • HH:mm", "d MMM HH:mm"
+    )
+    for (pattern in patterns) {
+        try {
+            val formatter = java.text.SimpleDateFormat(pattern, java.util.Locale.UK)
+            formatter.timeZone = java.util.TimeZone.getTimeZone("Europe/London")
+            formatter.isLenient = false
+            val parsed = formatter.parse(label) ?: continue
+            val calendar = java.util.Calendar.getInstance(java.util.TimeZone.getTimeZone("Europe/London"))
+            calendar.time = parsed
+            if (!label.contains(Regex("\\b20\\d{2}\\b"))) {
+                calendar.set(java.util.Calendar.YEAR, java.util.Calendar.getInstance(
+                    java.util.TimeZone.getTimeZone("Europe/London")).get(java.util.Calendar.YEAR))
+            }
+            return calendar.timeInMillis
+        } catch (_: Exception) { }
+    }
+    return null
 }
 
 private fun enc(value: String): String =
