@@ -1,7 +1,5 @@
 package com.anarchyukz.blackcatglobal
 
-import android.content.Intent
-import android.net.Uri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -32,7 +30,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -67,11 +64,14 @@ private data class GuideResult(
     val url: String
 )
 
+private data class WebResult(val title: String, val snippet: String, val source: String, val channels: List<String>)
+
 private data class DashboardData(
     val fixture: String?,
     val kickoff: String?,
     val fixtureSource: String,
     val guides: List<GuideResult>,
+    val searchResults: List<WebResult>,
     val errors: List<String>
 )
 
@@ -187,28 +187,26 @@ private fun BlackCatApp() {
                         } else {
                             Text(result.context ?: "No channel name could be reliably extracted; open the guide to confirm.", color = Muted, fontSize = 13.sp)
                         }
-                        TextButton(onClick = {
-                            context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(result.url)))
-                        }) {
-                            Text("OPEN GUIDE", color = CatRed, fontWeight = FontWeight.Bold)
-                        }
                     }
                 }
             }
 
-            Card(colors = CardDefaults.cardColors(containerColor = Panel), shape = RoundedCornerShape(15.dp)) {
-                Column(Modifier.padding(15.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text("Search worldwide listings", fontWeight = FontWeight.Bold)
-                    Text("These searches use the detected next fixture and can find country-by-country broadcaster pages when the guide sites publish them.", color = Muted, fontSize = 13.sp)
-                    val fixture = dashboard?.fixture ?: "Sunderland AFC next match"
-                    TextButton(onClick = {
-                        val query = enc("\"$fixture\" worldwide TV channel broadcaster Live Soccer TV")
-                        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://www.google.com/search?q=$query")))
-                    }) { Text("GOOGLE WORLDWIDE TV SEARCH", color = CatRed, fontWeight = FontWeight.Bold) }
-                    TextButton(onClick = {
-                        val query = enc("\"$fixture\" TV listings international broadcaster")
-                        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://www.bing.com/search?q=$query")))
-                    }) { Text("BING WORLDWIDE TV SEARCH", color = CatRed, fontWeight = FontWeight.Bold) }
+            Text("WORLDWIDE SEARCH RESULTS", fontSize = 13.sp, color = CatRed, fontWeight = FontWeight.ExtraBold, letterSpacing = 1.2.sp)
+            Text("Search summaries are shown here in the app. You do not need to open each TV guide.", color = Muted, fontSize = 13.sp)
+            val searchResults = dashboard?.searchResults.orEmpty()
+            if (!loading && searchResults.isEmpty()) {
+                Text("No worldwide search summaries were available. Try refreshing; some search providers limit automated requests.", color = Muted, fontSize = 13.sp)
+            }
+            searchResults.forEach { item ->
+                Card(colors = CardDefaults.cardColors(containerColor = Panel), shape = RoundedCornerShape(14.dp)) {
+                    Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text(item.title, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                        if (item.channels.isNotEmpty()) {
+                            Text("Possible broadcaster(s): " + item.channels.joinToString(", "), color = CatRed, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                        }
+                        Text(item.snippet, color = Muted, fontSize = 13.sp)
+                        Text("Source: " + item.source, color = Muted, fontSize = 11.sp)
+                    }
                 }
             }
 
@@ -283,13 +281,55 @@ private fun loadDashboard(): DashboardData {
         )
     }
 
+    val searchResults = if (fixture != null) fetchWorldwideSearchResults(fixture) else emptyList()
+
     return DashboardData(
         fixture = fixture,
         kickoff = kickoff,
         fixtureSource = fixtureSource,
         guides = guides,
+        searchResults = searchResults,
         errors = errors
     )
+}
+
+private fun fetchWorldwideSearchResults(fixture: String): List<WebResult> {
+    val query = "\"$fixture\" football TV channel broadcaster worldwide"
+    val results = mutableListOf<WebResult>()
+
+    try {
+        val google = Jsoup.connect("https://www.google.com/search?q=" + enc(query) + "&num=10")
+            .userAgent("Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/124.0 Mobile Safari/537.36")
+            .timeout(10000)
+            .get()
+        google.select("div.MjjYud").forEach { block ->
+            val title = block.selectFirst("h3")?.text()?.trim().orEmpty()
+            val snippet = block.selectFirst("div.VwiC3b, div[data-sncf], span.aCOpRe")?.text()?.trim().orEmpty()
+            if (title.isNotBlank() && snippet.isNotBlank()) {
+                val combined = "$title $snippet"
+                val channels = broadcasterTerms.filter { combined.contains(it, ignoreCase = true) }.distinct()
+                results.add(WebResult(title, snippet, "Google", channels))
+            }
+        }
+    } catch (_: Exception) { }
+
+    try {
+        val bing = Jsoup.connect("https://www.bing.com/search?q=" + enc(query) + "&count=10")
+            .userAgent("Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/124.0 Mobile Safari/537.36")
+            .timeout(10000)
+            .get()
+        bing.select("li.b_algo").forEach { block ->
+            val title = block.selectFirst("h2")?.text()?.trim().orEmpty()
+            val snippet = block.selectFirst("p")?.text()?.trim().orEmpty()
+            if (title.isNotBlank() && snippet.isNotBlank()) {
+                val combined = "$title $snippet"
+                val channels = broadcasterTerms.filter { combined.contains(it, ignoreCase = true) }.distinct()
+                results.add(WebResult(title, snippet, "Bing", channels))
+            }
+        }
+    } catch (_: Exception) { }
+
+    return results.distinctBy { it.title.lowercase() }.take(12)
 }
 
 private fun findFixtureContainer(anchor: org.jsoup.nodes.Element): org.jsoup.nodes.Element? {
