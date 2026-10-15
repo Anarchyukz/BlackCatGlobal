@@ -270,6 +270,12 @@ private fun loadDashboard(context: android.content.Context): DashboardData {
         )
     }
 
+    // Load saved previous-match details before refreshing them from results pages.
+    val prefs = context.getSharedPreferences("black_cat_global", android.content.Context.MODE_PRIVATE)
+    var previousFixture = prefs.getString("previous_fixture", null)
+    var previousKickoff = prefs.getString("previous_kickoff_label", null)
+    val now = System.currentTimeMillis()
+
     // Fetch completed results separately: TV listings generally only show upcoming fixtures,
     // so they cannot reliably supply the previous match.
     try {
@@ -323,11 +329,6 @@ private fun loadDashboard(context: android.content.Context): DashboardData {
 
     // Keep the selected fixture pinned from kick-off until the end of its 90-minute window.
     // This prevents guide pages rolling forward to the next fixture while the game is in progress.
-    val prefs = context.getSharedPreferences("black_cat_global", android.content.Context.MODE_PRIVATE)
-    var previousFixture = prefs.getString("previous_fixture", null)
-    var previousKickoff = prefs.getString("previous_kickoff_label", null)
-    val now = System.currentTimeMillis()
-
     // Also look for a past Sunderland fixture in the pages on first launch,
     // so the previous-match section does not depend on the app having been open before.
     val pastFixtures = docs.flatMap { (_, doc) ->
