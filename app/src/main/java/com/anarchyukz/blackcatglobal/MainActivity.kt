@@ -135,9 +135,10 @@ private fun BlackCatApp() {
 
     Surface(modifier = Modifier.fillMaxSize(), color = DeepBackground) {
         Column(
-            modifier = Modifier.fillMaxSize().padding(horizontal = 22.dp, vertical = 30.dp),
+            modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())
+                .padding(horizontal = 22.dp, vertical = 24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
+            verticalArrangement = Arrangement.Top
         ) {
             Box(
                 modifier = Modifier.background(CatRed, RoundedCornerShape(22.dp)).padding(17.dp),
@@ -267,6 +268,43 @@ private fun loadDashboard(context: android.content.Context): DashboardData {
             channels = channels,
             url = guidePages.first { it.first == name }.second
         )
+    }
+
+    // Fetch completed results separately: TV listings generally only show upcoming fixtures,
+    // so they cannot reliably supply the previous match.
+    try {
+        val resultsDoc = Jsoup.connect("https://www.11v11.com/teams/sunderland/option/fixtures/")
+            .userAgent("Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/124.0 Mobile Safari/537.36")
+            .timeout(12000)
+            .get()
+        val resultRows = resultsDoc.select("tr").mapNotNull { row ->
+            val text = row.text().replace(Regex("\\s+"), " ").trim()
+            if (!text.contains("Sunderland", ignoreCase = true) ||
+                !Regex("\\b\\d{1,2}\\s*[-–:]\\s*\\d{1,2}\\b").containsMatchIn(text)) return@mapNotNull null
+            val dateMatch = Regex("\\b\\d{1,2}\\s+[A-Za-z]{3,9}\\s+20\\d{2}\\b").find(text)
+                ?: Regex("\\b\\d{1,2}\\s+[A-Za-z]{3,9}\\b").find(text)
+                ?: return@mapNotNull null
+            val scoreMatch = Regex("\\b\\d{1,2}\\s*[-–:]\\s*\\d{1,2}\\b").find(text) ?: return@mapNotNull null
+            val dateText = dateMatch.value
+            val yearText = if (Regex("\\b20\\d{2}\\b").containsMatchIn(dateText)) dateText else "$dateText 2026"
+            val millis = try {
+                val pattern = if (yearText.contains(Regex("\\b20\\d{2}\\b"))) "d MMMM yyyy" else "d MMM"
+                val datePart = java.text.SimpleDateFormat(pattern, java.util.Locale.UK).parse(yearText)
+                datePart?.time
+            } catch (_: Exception) { null } ?: return@mapNotNull null
+            if (millis > now) return@mapNotNull null
+            val resultText = text.replace(dateText, "").trim()
+            Triple("$resultText", dateText, millis)
+        }.distinctBy { it.first.lowercase() }
+        val latestResult = resultRows.maxByOrNull { it.third }
+        if (latestResult != null) {
+            previousFixture = latestResult.first
+            previousKickoff = latestResult.second
+            prefs.edit().putString("previous_fixture", previousFixture)
+                .putString("previous_kickoff_label", previousKickoff).apply()
+        }
+    } catch (_: Exception) {
+        // Keep the last saved result if the results site is temporarily unavailable.
     }
 
     val searchResults = if (fixture != null) fetchWorldwideSearchResults(fixture) else emptyList()
