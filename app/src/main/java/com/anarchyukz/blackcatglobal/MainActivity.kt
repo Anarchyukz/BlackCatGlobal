@@ -262,22 +262,29 @@ private fun loadDashboard(context: android.content.Context): DashboardData {
     val pinnedFixture = prefs.getString("pinned_fixture", null)
     val pinnedKickoff = prefs.getLong("pinned_kickoff", 0L)
     val pinnedUntil = pinnedKickoff + 90L * 60L * 1000L
-    if (!pinnedFixture.isNullOrBlank() && pinnedKickoff > 0L && now in pinnedKickoff until pinnedUntil) {
+
+    // A fixture is "current" from its scheduled kick-off until at least 90 minutes later.
+    // Never replace it with the next listing while this window is still active.
+    if (!pinnedFixture.isNullOrBlank() && pinnedKickoff > 0L && now < pinnedUntil) {
         fixture = pinnedFixture
         kickoff = prefs.getString("pinned_kickoff_label", kickoff)
-        fixtureSource = "Pinned for match duration"
+        fixtureSource = "Current match held until full-time window"
     } else {
+        // The previous match's 90-minute window has ended: clear it before selecting the next fixture.
+        if (pinnedKickoff > 0L && now >= pinnedUntil) {
+            prefs.edit().remove("pinned_fixture").remove("pinned_kickoff")
+                .remove("pinned_kickoff_label").apply()
+        }
+
         val parsedKickoff = kickoff?.let { parseKickoffMillis(it) }
-        if (!fixture.isNullOrBlank() && parsedKickoff != null && parsedKickoff > now &&
-            parsedKickoff - now <= 7L * 24L * 60L * 60L * 1000L) {
+        if (!fixture.isNullOrBlank() && parsedKickoff != null &&
+            parsedKickoff - now <= 7L * 24L * 60L * 60L * 1000L &&
+            parsedKickoff > now - 90L * 60L * 1000L) {
             prefs.edit()
                 .putString("pinned_fixture", fixture)
                 .putLong("pinned_kickoff", parsedKickoff)
                 .putString("pinned_kickoff_label", kickoff)
                 .apply()
-        } else if (pinnedKickoff > 0L && now >= pinnedUntil) {
-            prefs.edit().remove("pinned_fixture").remove("pinned_kickoff")
-                .remove("pinned_kickoff_label").apply()
         }
     }
 
