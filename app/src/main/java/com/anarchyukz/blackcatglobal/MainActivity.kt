@@ -185,7 +185,7 @@ private fun BlackCatApp() {
                         if (!result.channels.isNullOrEmpty()) {
                             Text("Channels found: " + result.channels.joinToString(", "), color = Color.White, fontSize = 14.sp)
                         } else {
-                            Text(result.context ?: "No channel name could be reliably extracted; open the guide to confirm.", color = Muted, fontSize = 13.sp)
+                            Text(result.context ?: "No channel name could be extracted from this guide's public listing.", color = Muted, fontSize = 13.sp)
                         }
                     }
                 }
