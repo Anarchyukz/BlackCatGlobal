@@ -153,8 +153,7 @@ private fun BlackCatApp() {
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Top
         ) {
-            // Dense red monospace ASCII crest, based on the user's supplied Sunderland badge artwork.
-            // Keep it as text (not a bitmap); small type preserves the broad, symmetrical crest silhouette.
+            // Sunderland AFC wordmark supplied by the user, rendered as red monospace text.
             Text(
                 text = """
   ____                  _           _                 _      _      _____ ____ 
