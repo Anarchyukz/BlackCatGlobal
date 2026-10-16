@@ -78,6 +78,8 @@ private data class DashboardData(
     val kickoff: String?,
     val previousFixture: String?,
     val previousKickoff: String?,
+    val previousCupFixture: String?,
+    val previousCupKickoff: String?,
     val fixtureSource: String,
     val guides: List<GuideResult>,
     val searchResults: List<WebResult>,
@@ -245,13 +247,26 @@ private fun BlackCatApp() {
             Spacer(Modifier.height(24.dp))
             data?.previousFixture?.let { previous ->
                 Spacer(Modifier.height(20.dp))
-                Text("PREVIOUS MATCH", fontSize = 11.sp, color = Muted,
+                Text("PREVIOUS PREMIER LEAGUE MATCH", fontSize = 11.sp, color = Muted,
                     fontWeight = FontWeight.ExtraBold, letterSpacing = 2.sp)
                 Spacer(Modifier.height(7.dp))
                 Text(previous, fontSize = 16.sp, fontWeight = FontWeight.Bold,
                     color = Color.White,
                     textAlign = androidx.compose.ui.text.style.TextAlign.Center)
                 data.previousKickoff?.let { previousTime ->
+                    Spacer(Modifier.height(4.dp))
+                    Text(previousTime, color = Muted, fontSize = 12.sp)
+                }
+            }
+            data?.previousCupFixture?.let { previous ->
+                Spacer(Modifier.height(20.dp))
+                Text("PREVIOUS CUP / EUROPE MATCH", fontSize = 11.sp, color = Muted,
+                    fontWeight = FontWeight.ExtraBold, letterSpacing = 2.sp)
+                Spacer(Modifier.height(7.dp))
+                Text(previous, fontSize = 16.sp, fontWeight = FontWeight.Bold,
+                    color = Color.White,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+                data.previousCupKickoff?.let { previousTime ->
                     Spacer(Modifier.height(4.dp))
                     Text(previousTime, color = Muted, fontSize = 12.sp)
                 }
@@ -332,6 +347,8 @@ private fun loadDashboard(context: android.content.Context): DashboardData {
     val prefs = context.getSharedPreferences("black_cat_global", android.content.Context.MODE_PRIVATE)
     var previousFixture = prefs.getString("previous_fixture", null)
     var previousKickoff = prefs.getString("previous_kickoff_label", null)
+    var previousCupFixture = prefs.getString("previous_cup_fixture", null)
+    var previousCupKickoff = prefs.getString("previous_cup_kickoff_label", null)
     val now = System.currentTimeMillis()
 
     // Fetch completed results separately: TV listings generally only show upcoming fixtures,
@@ -348,7 +365,6 @@ private fun loadDashboard(context: android.content.Context): DashboardData {
             val dateMatch = Regex("\\b\\d{1,2}\\s+[A-Za-z]{3,9}\\s+20\\d{2}\\b").find(text)
                 ?: Regex("\\b\\d{1,2}\\s+[A-Za-z]{3,9}\\b").find(text)
                 ?: return@mapNotNull null
-            val scoreMatch = Regex("\\b\\d{1,2}\\s*[-–:]\\s*\\d{1,2}\\b").find(text) ?: return@mapNotNull null
             val dateText = dateMatch.value
             val yearText = if (Regex("\\b20\\d{2}\\b").containsMatchIn(dateText)) dateText else "$dateText 2026"
             val millis = try {
@@ -362,15 +378,30 @@ private fun loadDashboard(context: android.content.Context): DashboardData {
                 }
             } catch (_: Exception) { null } ?: return@mapNotNull null
             if (millis > now) return@mapNotNull null
+            val competition = row.select("td,th").joinToString(" ") { it.text() }
             val resultText = text.replace(dateText, "").trim()
-            Triple("$resultText", dateText, millis)
-        }.distinctBy { it.first.lowercase() }
-        val latestResult = resultRows.maxByOrNull { it.third }
+            Triple(resultText, dateText, millis) to competition
+        }.distinctBy { it.first.first.lowercase() }
+        val leagueRows = resultRows.filter { (_, competition) ->
+            competition.contains("Premier League", ignoreCase = true)
+        }.map { it.first }
+        val cupRows = resultRows.filter { (_, competition) ->
+            Regex("(?i)FA Cup|EFL Cup|Carabao Cup|League Cup|Champions League|Europa League|Conference League|UEFA|EFL Trophy").containsMatchIn(competition)
+        }.map { it.first }
+        val latestResult = (if (leagueRows.isNotEmpty()) leagueRows else resultRows.map { it.first })
+            .maxByOrNull { it.third }
         if (latestResult != null) {
             previousFixture = latestResult.first
             previousKickoff = latestResult.second
             prefs.edit().putString("previous_fixture", previousFixture)
                 .putString("previous_kickoff_label", previousKickoff).apply()
+        }
+        val latestCupResult = cupRows.maxByOrNull { it.third }
+        if (latestCupResult != null) {
+            previousCupFixture = latestCupResult.first
+            previousCupKickoff = latestCupResult.second
+            prefs.edit().putString("previous_cup_fixture", previousCupFixture)
+                .putString("previous_cup_kickoff_label", previousCupKickoff).apply()
         }
     } catch (_: Exception) {
         // Keep the last saved result if the results site is temporarily unavailable.
@@ -454,6 +485,8 @@ private fun loadDashboard(context: android.content.Context): DashboardData {
         kickoff = kickoff,
         previousFixture = previousFixture,
         previousKickoff = previousKickoff,
+        previousCupFixture = previousCupFixture,
+        previousCupKickoff = previousCupKickoff,
         fixtureSource = fixtureSource,
         guides = guides,
         searchResults = searchResults,
