@@ -66,6 +66,13 @@ private data class GuideResult(
 
 private data class WebResult(val title: String, val snippet: String, val source: String, val channels: List<String>)
 
+private data class LineupTeam(
+    val name: String,
+    val formation: String?,
+    val starters: List<String>,
+    val substitutes: List<String>
+)
+
 private data class DashboardData(
     val fixture: String?,
     val kickoff: String?,
@@ -74,6 +81,7 @@ private data class DashboardData(
     val fixtureSource: String,
     val guides: List<GuideResult>,
     val searchResults: List<WebResult>,
+    val lineups: List<LineupTeam>,
     val errors: List<String>
 )
 
@@ -184,6 +192,41 @@ private fun BlackCatApp() {
                         lineHeight = 29.sp)
                 }
             }
+                Spacer(Modifier.height(30.dp))
+                Text("TEAM LINE-UPS", fontSize = 12.sp, color = CatRed,
+                    fontWeight = FontWeight.ExtraBold, letterSpacing = 2.4.sp)
+                Spacer(Modifier.height(12.dp))
+                if (data?.lineups.isNullOrEmpty()) {
+                    Text(
+                        "Starting line-ups will appear here when published, usually around an hour before kick-off.",
+                        color = Muted, fontSize = 14.sp,
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                        lineHeight = 21.sp
+                    )
+                } else {
+                    data!!.lineups.forEach { team ->
+                        Spacer(Modifier.height(8.dp))
+                        Text(team.name.uppercase(), color = Color.White,
+                            fontSize = 15.sp, fontWeight = FontWeight.ExtraBold)
+                        team.formation?.let {
+                            Text("Formation: $it", color = Muted, fontSize = 12.sp)
+                        }
+                        Spacer(Modifier.height(5.dp))
+                        Text("STARTING XI", color = CatRed, fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold, letterSpacing = 1.2.sp)
+                        Text(team.starters.joinToString("\n"), color = Color.White,
+                            fontSize = 14.sp, lineHeight = 20.sp,
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+                        if (team.substitutes.isNotEmpty()) {
+                            Spacer(Modifier.height(8.dp))
+                            Text("SUBSTITUTES", color = CatRed, fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold, letterSpacing = 1.2.sp)
+                            Text(team.substitutes.joinToString("\n"), color = Muted,
+                                fontSize = 13.sp, lineHeight = 19.sp,
+                                textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+                        }
+                    }
+                }
             Spacer(Modifier.height(24.dp))
             data?.previousFixture?.let { previous ->
                 Spacer(Modifier.height(20.dp))
@@ -326,6 +369,7 @@ private fun loadDashboard(context: android.content.Context): DashboardData {
     }
 
     val searchResults = if (fixture != null) fetchWorldwideSearchResults(fixture) else emptyList()
+    val lineups = if (fixture != null) fetchLineups(fixture) else emptyList()
 
     // Keep the selected fixture pinned from kick-off until the end of its 90-minute window.
     // This prevents guide pages rolling forward to the next fixture while the game is in progress.
@@ -397,8 +441,131 @@ private fun loadDashboard(context: android.content.Context): DashboardData {
         fixtureSource = fixtureSource,
         guides = guides,
         searchResults = searchResults,
+        lineups = lineups,
         errors = errors
     )
+}
+
+
+/**
+ * ESPN's public scoreboard/summary endpoints expose confirmed match line-ups without an API key.
+ * If the teams have not announced them yet, this returns an empty list and the screen says so.
+ */
+private fun fetchLineups(fixture: String): List<LineupTeam> {
+    val sides = fixture.split(Regex("(?i)\\s+(?:v|vs|versus)\\.?\\s+"))
+        .map { it.trim() }
+        .filter { it.isNotBlank() }
+    if (sides.size < 2) return emptyList()
+
+    val now = java.util.Calendar.getInstance(java.util.TimeZone.getTimeZone("UTC"))
+    val from = java.text.SimpleDateFormat("yyyyMMdd", java.util.Locale.US).apply {
+        timeZone = java.util.TimeZone.getTimeZone("UTC")
+    }.format(now.time)
+    now.add(java.util.Calendar.DAY_OF_YEAR, 45)
+    val to = java.text.SimpleDateFormat("yyyyMMdd", java.util.Locale.US).apply {
+        timeZone = java.util.TimeZone.getTimeZone("UTC")
+    }.format(now.time)
+
+    val candidateEvents = mutableListOf<org.json.JSONObject>()
+    for (league in listOf("eng.1", "eng.2")) {
+        try {
+            val url = "https://site.api.espn.com/apis/site/v2/sports/soccer/$league/scoreboard?dates=$from-$to&limit=100"
+            val jsonText = Jsoup.connect(url)
+                .ignoreContentType(true)
+                .userAgent("Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/124.0 Mobile Safari/537.36")
+                .timeout(10000)
+                .execute().body()
+            val events = org.json.JSONObject(jsonText).optJSONArray("events") ?: continue
+            for (i in 0 until events.length()) {
+                val event = events.optJSONObject(i) ?: continue
+                val competitors = event.optJSONObject("competitions")?.optJSONArray("competitors")
+                    ?: event.optJSONArray("competitors")
+                val names = mutableListOf<String>()
+                if (competitors != null) for (j in 0 until competitors.length()) {
+                    val team = competitors.optJSONObject(j)?.optJSONObject("team")
+                    val teamName = team?.optString("displayName").orEmpty()
+                    if (teamName.isNotBlank()) names.add(teamName)
+                }
+                val eventName = event.optString("name", "")
+                val allNames = (names + eventName).joinToString(" ")
+                if (allNames.contains("Sunderland", ignoreCase = true) &&
+                    sides.all { side ->
+                        val cleaned = side.replace(Regex("(?i)\\b(afc|fc)\\b"), "").trim()
+                        cleaned.length < 4 || allNames.contains(cleaned, ignoreCase = true) ||
+                            cleaned.split(" ").firstOrNull()?.let { allNames.contains(it, ignoreCase = true) } == true
+                    }) {
+                    candidateEvents.add(event)
+                }
+            }
+        } catch (_: Exception) {
+            // Try the other English league; lineup data may not be available from every source.
+        }
+    }
+
+    val event = candidateEvents.firstOrNull() ?: return emptyList()
+    val eventId = event.optString("id").takeIf { it.isNotBlank() } ?: return emptyList()
+    return try {
+        val summaryUrl = "https://site.api.espn.com/apis/site/v2/sports/soccer/eng.1/summary?event=$eventId"
+        var summaryText = Jsoup.connect(summaryUrl).ignoreContentType(true)
+            .userAgent("Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/124.0 Mobile Safari/537.36")
+            .timeout(10000).execute().body()
+        var parsed = parseEspnLineups(summaryText)
+        if (parsed.isEmpty()) {
+            // Championship events may need the matching league summary endpoint.
+            summaryText = Jsoup.connect("https://site.api.espn.com/apis/site/v2/sports/soccer/eng.2/summary?event=$eventId")
+                .ignoreContentType(true)
+                .userAgent("Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/124.0 Mobile Safari/537.36")
+                .timeout(10000).execute().body()
+            parsed = parseEspnLineups(summaryText)
+        }
+        parsed
+    } catch (_: Exception) {
+        emptyList()
+    }
+}
+
+private fun parseEspnLineups(jsonText: String): List<LineupTeam> {
+    return try {
+        val root = org.json.JSONObject(jsonText)
+        val boxscore = root.optJSONObject("boxscore") ?: return emptyList()
+        val teams = boxscore.optJSONArray("players") ?: return emptyList()
+        val result = mutableListOf<LineupTeam>()
+        for (i in 0 until teams.length()) {
+            val teamObj = teams.optJSONObject(i) ?: continue
+            val teamName = teamObj.optJSONObject("team")?.optString("displayName").orEmpty()
+            if (teamName.isBlank()) continue
+            val starters = linkedSetOf<String>()
+            val substitutes = linkedSetOf<String>()
+            val formation = teamObj.optString("formation").takeIf { it.isNotBlank() && it != "null" }
+            val statsGroups = teamObj.optJSONArray("statistics")
+            if (statsGroups != null) {
+                for (g in 0 until statsGroups.length()) {
+                    val group = statsGroups.optJSONObject(g) ?: continue
+                    val athletes = group.optJSONArray("athletes") ?: continue
+                    for (a in 0 until athletes.length()) {
+                        val entry = athletes.optJSONObject(a) ?: continue
+                        val athlete = entry.optJSONObject("athlete") ?: entry
+                        val name = athlete.optString("displayName",
+                            athlete.optString("fullName", athlete.optString("name", ""))).trim()
+                        if (name.isBlank()) continue
+                        val jersey = athlete.opt("jersey")?.toString()?.takeIf { it.isNotBlank() && it != "null" }
+                        val position = athlete.optJSONObject("position")?.optString("abbreviation")
+                            ?.takeIf { !it.isNullOrBlank() && it != "null" }
+                        val label = listOfNotNull(jersey?.let { "$it." }, name, position?.let { "($it)" })
+                            .joinToString(" ")
+                        val isStarter = entry.optBoolean("starter", athlete.optBoolean("starter", false))
+                        if (isStarter) starters.add(label) else substitutes.add(label)
+                    }
+                }
+            }
+            if (starters.isNotEmpty()) {
+                result.add(LineupTeam(teamName, formation, starters.toList(), substitutes.toList()))
+            }
+        }
+        result
+    } catch (_: Exception) {
+        emptyList()
+    }
 }
 
 private fun fetchWorldwideSearchResults(fixture: String): List<WebResult> {
