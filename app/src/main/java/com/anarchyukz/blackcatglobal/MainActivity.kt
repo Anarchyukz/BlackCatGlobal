@@ -153,22 +153,31 @@ private fun BlackCatApp() {
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Top
         ) {
-            // Text-only ASCII cat emblem: deliberately rendered in monospace, not as an image.
+            // Text-only ASCII rendition of Sunderland's crest silhouette and key motifs.
             Text(
                 text = """
-                     /\\                 /\\
-                    /  \\_______________/  \\
-                   /                       \\
-                  /   /\\             /\\   \\
-                 |   /  \\           /  \\   |
-                 |       .-----------.       |
-                 |      /  /\\   /\\  \\      |
-                 |     |  (  \\_/  )  |     |
-                 |     |     /___\\     |     |
-                 |      \\   \\_____/   /      |
-                  \\      '-----------'      /
-                   \\                       /
-                    \\_____________________/
+                         /\\
+                        /  \\
+                   ____/____\\____
+                  /   SUNDERLAND   \\
+                 /------------------\\
+                |   .----SHIP----.   |
+                |   |  _/\\_     |   |
+                |   | /____\\    |   |
+                |   '------------'   |
+                |  /\\          /\\  |
+                | (  )  /\\ /\\ (  ) |
+                |  \\/  |  X  |  \\/  |
+                |      | / \\ |      |
+                |  /\\ |/   \\| /\\  |
+                |  \\ /|  CAT  |\\ /  |
+                 \\   |\\_____/|   /
+                  \\  |  | |  |  /
+                   \\ |  | |  | /
+                    \\|__|_|__|/
+                     \\_______/
+                   S U N D E R L A N D
+                         A F C
                 """.trimIndent(),
                 color = CatRed,
                 fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
