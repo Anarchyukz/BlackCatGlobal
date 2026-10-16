@@ -82,6 +82,7 @@ private data class DashboardData(
     val guides: List<GuideResult>,
     val searchResults: List<WebResult>,
     val lineups: List<LineupTeam>,
+    val squadPlayers: List<String>,
     val errors: List<String>
 )
 
@@ -198,11 +199,25 @@ private fun BlackCatApp() {
                 Spacer(Modifier.height(12.dp))
                 if (data?.lineups.isNullOrEmpty()) {
                     Text(
-                        "Starting line-ups will appear here when published, usually around an hour before kick-off.",
+                        "Confirmed starting line-ups are not available yet.",
                         color = Muted, fontSize = 14.sp,
                         textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                         lineHeight = 21.sp
                     )
+                    if (!data?.squadPlayers.isNullOrEmpty()) {
+                        Spacer(Modifier.height(14.dp))
+                        Text("PREMIER LEAGUE SQUAD", color = Color.White,
+                            fontSize = 13.sp, fontWeight = FontWeight.ExtraBold,
+                            letterSpacing = 1.2.sp)
+                        Spacer(Modifier.height(4.dp))
+                        Text("Registered first-team squad • not the match-day starting XI",
+                            color = Muted, fontSize = 12.sp,
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+                        Spacer(Modifier.height(8.dp))
+                        Text(data!!.squadPlayers.joinToString("\n"), color = Color.White,
+                            fontSize = 14.sp, lineHeight = 21.sp,
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+                    }
                 } else {
                     data!!.lineups.forEach { team ->
                         Spacer(Modifier.height(8.dp))
@@ -370,6 +385,7 @@ private fun loadDashboard(context: android.content.Context): DashboardData {
 
     val searchResults = if (fixture != null) fetchWorldwideSearchResults(fixture) else emptyList()
     val lineups = if (fixture != null) fetchLineups(fixture) else emptyList()
+    val squadPlayers = fetchPremierLeagueSquad()
 
     // Keep the selected fixture pinned from kick-off until the end of its 90-minute window.
     // This prevents guide pages rolling forward to the next fixture while the game is in progress.
@@ -442,10 +458,46 @@ private fun loadDashboard(context: android.content.Context): DashboardData {
         guides = guides,
         searchResults = searchResults,
         lineups = lineups,
+        squadPlayers = squadPlayers,
         errors = errors
     )
 }
 
+
+/**
+ * Reads Sunderland's current squad numbers from the official Premier League website.
+ * This is only a squad fallback; it must never be presented as the confirmed match-day XI.
+ */
+private fun fetchPremierLeagueSquad(): List<String> {
+    return try {
+        val doc = Jsoup.connect(
+            "https://www.premierleague.com/en/news/4725682/all-20-premier-league-clubs-squad-numbers-for-202627-season"
+        )
+            .userAgent("Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/124.0 Mobile Safari/537.36")
+            .timeout(12000)
+            .get()
+
+        val heading = doc.select("h1, h2, h3, h4")
+            .firstOrNull { it.text().trim().equals("Sunderland", ignoreCase = true) }
+            ?: return emptyList()
+
+        val players = linkedSetOf<String>()
+        var element = heading.nextElementSibling()
+        while (element != null && !element.tagName().matches(Regex("h[1-4]"))) {
+            val text = element.text().replace(Regex("\\s+"), " ").trim()
+            if (text.isNotBlank()) {
+                // Squad-number article lines start with a shirt number followed by a player name.
+                Regex("""^(\\d{1,3})\\s+(.+)$""").matchEntire(text)?.let { match ->
+                    players.add("${match.groupValues[1]}  ${match.groupValues[2]}")
+                }
+            }
+            element = element.nextElementSibling()
+        }
+        players.toList()
+    } catch (_: Exception) {
+        emptyList()
+    }
+}
 
 /**
  * ESPN's public scoreboard/summary endpoints expose confirmed match line-ups without an API key.
