@@ -393,7 +393,33 @@ private fun loadDashboard(context: android.content.Context): DashboardData {
             prefs.edit().putString("previous_fixture", previousFixture)
                 .putString("previous_kickoff_label", previousKickoff).apply()
         }
-        val latestCupResult = cupRows.maxByOrNull { it.third }
+        // Use 11v11's full match-record table for cup/European competitions.
+        // This is intentionally separate from the existing Premier League previous-match source.
+        val allMatchesDoc = Jsoup.connect("https://www.11v11.com/teams/sunderland/tab/matches/")
+            .userAgent("Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/124.0 Mobile Safari/537.36")
+            .timeout(12000)
+            .get()
+        val cupResults = allMatchesDoc.select("tr").mapNotNull { row ->
+            val cells = row.select("td")
+            if (cells.size < 5) return@mapNotNull null
+            val text = row.text().replace(Regex("\\s+"), " ").trim()
+            if (!text.contains("Sunderland", ignoreCase = true)) return@mapNotNull null
+            val competition = cells.last()?.text()?.trim().orEmpty()
+            if (!Regex("(?i)FA Cup|EFL Cup|League Cup|Carabao Cup|Champions League|Europa League|Conference League|UEFA|EFL Trophy").containsMatchIn(competition)) return@mapNotNull null
+            val dateText = cells.first()?.text()?.trim().orEmpty()
+            if (!Regex("\\b\\d{1,2}\\s+[A-Za-z]{3,9}\\s+20\\d{2}\\b").containsMatchIn(dateText)) return@mapNotNull null
+            val millis = try {
+                val parser = java.text.SimpleDateFormat("d MMM yyyy", java.util.Locale.UK)
+                parser.isLenient = false
+                parser.parse(dateText)?.time
+            } catch (_: Exception) { null } ?: return@mapNotNull null
+            if (millis > now) return@mapNotNull null
+            val match = cells.getOrNull(1)?.text()?.trim().orEmpty()
+            val score = cells.getOrNull(3)?.text()?.trim().orEmpty()
+            val resultText = listOf(match, score, competition).filter { it.isNotBlank() }.joinToString(" • ")
+            Triple(resultText, dateText, millis)
+        }
+        val latestCupResult = cupResults.maxByOrNull { it.third }
         if (latestCupResult != null) {
             previousCupFixture = latestCupResult.first
             previousCupKickoff = latestCupResult.second
