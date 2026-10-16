@@ -487,7 +487,7 @@ private fun fetchPremierLeagueSquad(): List<String> {
             val text = element.text().replace(Regex("\\s+"), " ").trim()
             if (text.isNotBlank()) {
                 // Squad-number article lines start with a shirt number followed by a player name.
-                Regex("""^(\\d{1,3})\\s+(.+)$""").matchEntire(text)?.let { match ->
+                Regex("""^(\d{1,3})\s+(.+)$""").matchEntire(text)?.let { match ->
                     players.add("${match.groupValues[1]}  ${match.groupValues[2]}")
                 }
             }
