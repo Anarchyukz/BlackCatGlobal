@@ -384,9 +384,6 @@ private fun loadDashboard(context: android.content.Context): DashboardData {
         }.distinctBy { it.first.first.lowercase() }
         // Keep the existing previous-match behaviour unchanged.
         val latestResult = resultRows.maxByOrNull { it.first.third }?.first
-        val cupRows = resultRows.filter { (_, competition) ->
-            Regex("(?i)FA Cup|EFL Cup|Carabao Cup|League Cup|Champions League|Europa League|Conference League|UEFA|EFL Trophy").containsMatchIn(competition)
-        }.map { it.first }
         if (latestResult != null) {
             previousFixture = latestResult.first
             previousKickoff = latestResult.second
