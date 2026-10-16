@@ -165,8 +165,9 @@ private fun BlackCatApp() {
 """.trimIndent(),
                 color = CatRed,
                 fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
-                fontSize = 2.4.sp,
-                lineHeight = 2.4.sp,
+                fontSize = 4.2.sp,
+                lineHeight = 4.2.sp,
+                fontWeight = FontWeight.Black,
                 textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                 modifier = Modifier.fillMaxWidth()
             )
