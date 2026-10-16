@@ -153,13 +153,29 @@ private fun BlackCatApp() {
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Top
         ) {
-            Box(
-                modifier = Modifier.background(CatRed, RoundedCornerShape(22.dp)).padding(17.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(Icons.Default.SportsSoccer, contentDescription = null, tint = Color.White,
-                    modifier = Modifier.width(34.dp).height(34.dp))
-            }
+            // Text-only ASCII cat emblem: deliberately rendered in monospace, not as an image.
+            Text(
+                text = """
+                     /\\                 /\\
+                    /  \\_______________/  \\
+                   /                       \\
+                  /   /\\             /\\   \\
+                 |   /  \\           /  \\   |
+                 |       .-----------.       |
+                 |      /  /\\   /\\  \\      |
+                 |     |  (  \\_/  )  |     |
+                 |     |     /___\\     |     |
+                 |      \\   \\_____/   /      |
+                  \\      '-----------'      /
+                   \\                       /
+                    \\_____________________/
+                """.trimIndent(),
+                color = CatRed,
+                fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                fontSize = 8.sp,
+                lineHeight = 8.sp,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+            )
             Spacer(Modifier.height(16.dp))
             Text("BLACK CAT GLOBAL", fontSize = 23.sp, fontWeight = FontWeight.Black,
                 color = Color.White, letterSpacing = 1.2.sp)
