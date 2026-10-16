@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -146,7 +147,8 @@ private fun BlackCatApp() {
 
     Surface(modifier = Modifier.fillMaxSize(), color = DeepBackground) {
         Column(
-            modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())
+            modifier = Modifier.fillMaxSize().statusBarsPadding()
+                .verticalScroll(rememberScrollState())
                 .padding(horizontal = 22.dp, vertical = 24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Top
@@ -273,6 +275,15 @@ private fun BlackCatApp() {
             }
             Spacer(Modifier.height(12.dp))
             Text("Listings refresh automatically", color = Muted, fontSize = 12.sp)
+            Spacer(Modifier.height(10.dp))
+            Text(
+                "Black Cat Global provides information about TV channels and broadcasters showing Sunderland matches. It does not stream, host or provide the matches themselves. Listings are for information only and may not always be accurate or available in every region.",
+                color = Muted,
+                fontSize = 11.sp,
+                lineHeight = 16.sp,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp)
+            )
         }
     }
 }
