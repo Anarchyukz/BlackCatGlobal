@@ -580,8 +580,17 @@ private fun loadDashboard(context: android.content.Context): DashboardData {
         val nearbyText = extractBroadcastersNearFixture(doc, anchor, fixture)
         val linkText = container?.select("a")?.map { it.text().trim() }.orEmpty()
         val haystack = (context.orEmpty() + " " + linkText.joinToString(" ") + " " + nearbyText)
-        val channels = broadcasterTerms.filter { term -> haystack.contains(term, ignoreCase = true) }
+        val preciseChannels = broadcasterTerms.filter { term -> haystack.contains(term, ignoreCase = true) }
             .distinctBy { canonicalChannelName(it).lowercase() }
+        // Some listing pages render broadcaster labels outside the match card. If the
+        // local card extraction misses them, use the guide's own Sunderland listings
+        // as a fallback instead of leaving the app's channel tab completely blank.
+        val pageText = doc.body().text().replace(Regex("\\s+"), " ")
+        val channels = if (preciseChannels.isNotEmpty()) preciseChannels else
+            if (pageText.contains("Sunderland", ignoreCase = true))
+                broadcasterTerms.filter { term -> pageText.contains(term, ignoreCase = true) }
+                    .distinctBy { canonicalChannelName(it).lowercase() }
+            else emptyList()
         GuideResult(
             name = name,
             fixture = anchor?.text()?.replace(Regex("\\s+"), " ")?.takeIf { it.isNotBlank() },
