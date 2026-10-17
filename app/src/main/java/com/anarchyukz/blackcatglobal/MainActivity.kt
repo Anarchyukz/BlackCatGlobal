@@ -1139,13 +1139,25 @@ private fun fetchWorldwideSearchResults(fixture: String): List<WebResult> {
     // Search areas are labels for the query, not claims that every result is confirmed in that territory.
     val queries = listOf(
         "Worldwide" to "\"$fixture\" international TV broadcast channels worldwide football",
-        "Worldwide" to "\"$fixture\" live soccer TV broadcast rights broadcaster international",
-        "UK / Ireland" to "\"$fixture\" UK TV channel Sky Sports+ coverage time",
-        "USA / Canada" to "\"$fixture\" watch live USA NBC Peacock Canada Fubo match listing",
-        "Australia / New Zealand" to "\"$fixture\" Australia Optus Sport Stan Sport New Zealand Sky Sport match",
-        "Europe" to "\"$fixture\" Germany Austria Sky Sport WOW France Canal+ Spain DAZN Netherlands Viaplay Italy NOW",
-        "Nordics / Poland" to "\"$fixture\" Sweden Norway Denmark Viaplay V Sport Poland Canal+ Extra match",
-        "Africa / Asia" to "\"$fixture\" SuperSport beIN SPORTS JioHotstar StarHub TV live match"
+        "Worldwide" to "\"$fixture\" where to watch live TV listings broadcaster by country",
+        "UK" to "\"$fixture\" Sky Sports+ Sky Sports Football UK TV listing",
+        "USA" to "\"$fixture\" Peacock NBC Sports USA broadcast schedule",
+        "Canada" to "\"$fixture\" Fubo Canada Premier League match TV schedule",
+        "Australia" to "\"$fixture\" Optus Sport Australia broadcast",
+        "New Zealand" to "\"$fixture\" Sky Sport NZ Premier League TV listing",
+        "Germany / Austria" to "\"$fixture\" Sky Sport HD 9 Sky Go WOW Deutschland Österreich",
+        "France" to "\"$fixture\" Canal+ Live 2 Canal+ Premier League diffusion",
+        "Spain" to "\"$fixture\" DAZN España Premier League partido dónde ver",
+        "Netherlands" to "\"$fixture\" Viaplay Nederland Premier League wedstrijd",
+        "Nordics" to "\"$fixture\" V Sport 1 V Sport Premier League Viaplay Sweden Norway Denmark",
+        "Italy" to "\"$fixture\" NOW Italia Premier League partita TV",
+        "Poland" to "\"$fixture\" Canal+ Extra 5 Canal+ Online Premier League",
+        "Africa" to "\"$fixture\" SuperSport Premier League TV listing",
+        "Middle East" to "\"$fixture\" beIN SPORTS MENA TOD Premier League broadcast",
+        "India" to "\"$fixture\" JioHotstar Star Sports India Premier League broadcast",
+        "Asia" to "\"$fixture\" StarHub TV SPOTV Premier League channel",
+        "Brazil" to "\"$fixture\" ESPN Brasil TNT Sports Brasil BandSports transmissão",
+        "Portugal" to "\"$fixture\" Sport TV Portugal Premier League transmissão"
     )
     val results = mutableListOf<WebResult>()
     val agent = "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/124.0 Mobile Safari/537.36"
@@ -1156,10 +1168,11 @@ private fun fetchWorldwideSearchResults(fixture: String): List<WebResult> {
                 .userAgent(agent)
                 .timeout(5500)
                 .get()
-            google.select("div.MjjYud").forEach { block ->
+            val blocks = google.select("div.MjjYud, div.g, div.tF2Cxc")
+            blocks.forEach { block ->
                 val title = block.selectFirst("h3")?.text()?.trim().orEmpty()
-                val snippet = block.selectFirst("div.VwiC3b, div[data-sncf], span.aCOpRe")?.text()?.trim().orEmpty()
-                if (title.isNotBlank() && snippet.isNotBlank()) {
+                val snippet = block.selectFirst("div.VwiC3b, div[data-sncf], span.aCOpRe, div.IsZvec")?.text()?.trim().orEmpty()
+                if (title.isNotBlank()) {
                     val combined = "$title $snippet"
                     val found = broadcasterTerms.filter { combined.contains(it, ignoreCase = true) }
                         .distinctBy { it.lowercase() }
@@ -1176,7 +1189,7 @@ private fun fetchWorldwideSearchResults(fixture: String): List<WebResult> {
             bing.select("li.b_algo").forEach { block ->
                 val title = block.selectFirst("h2")?.text()?.trim().orEmpty()
                 val snippet = block.selectFirst("p")?.text()?.trim().orEmpty()
-                if (title.isNotBlank() && snippet.isNotBlank()) {
+                if (title.isNotBlank()) {
                     val combined = "$title $snippet"
                     val found = broadcasterTerms.filter { combined.contains(it, ignoreCase = true) }
                         .distinctBy { it.lowercase() }
@@ -1187,7 +1200,7 @@ private fun fetchWorldwideSearchResults(fixture: String): List<WebResult> {
     }
 
     // Keep a larger set because each regional query can reveal a different official listing.
-    return results.distinctBy { (it.title + "|" + it.region).lowercase() }.take(48)
+    return results.distinctBy { (it.title + "|" + it.region).lowercase() }.take(100)
 }
 
 private data class GitHubUpdate(val tag: String, val versionCode: Int, val downloadUrl: String)
@@ -1223,6 +1236,8 @@ private fun checkForGitHubUpdate(): GitHubUpdate? {
 
 private fun isStreamingService(raw: String): Boolean {
     val value = raw.trim().lowercase()
+    // "Viaplay Sports" is a branded TV channel; plain Viaplay is the streaming service.
+    if (value.startsWith("viaplay sports")) return false
     return listOf(
         "peacock", "fubo", "optus sport", "viaplay", "dazn", "stan sport",
         "jiohotstar", "paramount+", "disney+", "hbo max", "now", "sky go",
