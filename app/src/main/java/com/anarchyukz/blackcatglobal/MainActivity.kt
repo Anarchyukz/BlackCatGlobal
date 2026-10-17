@@ -274,8 +274,8 @@ private fun BlackCatApp() {
                             Text("BC", color = Color.White, fontWeight = FontWeight.Black, fontSize = 18.sp)
                         }
                         Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
-                            Text("BLACK CAT", color = Color.White, fontWeight = FontWeight.Black, fontSize = 19.sp, letterSpacing = 1.1.sp)
-                            Text("GLOBAL  •  SUNDERLAND AFC", color = Muted, fontSize = 9.sp, letterSpacing = 1.1.sp)
+                            Text("BLACK CAT GLOBAL", color = Color.White, fontWeight = FontWeight.Black, fontSize = 17.sp, letterSpacing = 0.7.sp, maxLines = 1)
+                            Text("SUNDERLAND AFC", color = Muted, fontSize = 9.sp, letterSpacing = 1.5.sp)
                         }
                     }
                     androidx.compose.material3.IconButton(onClick = { refreshToken++ }) {
