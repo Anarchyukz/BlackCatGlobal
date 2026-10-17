@@ -770,6 +770,12 @@ private fun loadDashboard(context: android.content.Context): DashboardData {
             .putString("previous_kickoff_label", previousKickoff).apply()
     }
 
+    // Google often publishes the scheduled UK kick-off when TV guides omit it.
+    if (kickoff.isNullOrBlank() && !fixture.isNullOrBlank()) {
+        kickoff = fetchKickoffFromGoogle(fixture)
+        if (!kickoff.isNullOrBlank()) fixtureSource = "Google match listing"
+    }
+
     val searchResults = if (fixture != null) fetchWorldwideSearchResults(fixture) else emptyList()
     val lineups = if (fixture != null) fetchLineups(fixture) else emptyList()
     val squadPlayers = fetchPremierLeagueSquad()
@@ -1046,6 +1052,39 @@ private fun extractBroadcastersNearFixture(
         }
     }
     return ""
+}
+
+private fun fetchKickoffFromGoogle(fixture: String): String? {
+    val query = "\"${fixture}\" kick-off time date UK"
+    return try {
+        val doc = Jsoup.connect("https://www.google.com/search?q=" + enc(query) + "&num=8")
+            .userAgent("Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/124.0 Mobile Safari/537.36")
+            .timeout(9000)
+            .get()
+        doc.select("div.MjjYud").firstNotNullOfOrNull { block ->
+            val text = listOf(block.selectFirst("h3")?.text().orEmpty(),
+                block.selectFirst("div.VwiC3b, div[data-sncf], span.aCOpRe")?.text().orEmpty(),
+                block.text()).joinToString(" ")
+            extractKickoff(text) ?: extractGoogleKickoff(text)
+        }
+    } catch (_: Exception) { null }
+}
+
+private fun extractGoogleKickoff(text: String): String? {
+    val clean = text.replace(Regex("\\s+"), " ")
+    val dateMatch = Regex("(?i)\\b(Mon|Tue|Wed|Thu|Fri|Sat|Sun)(?:day)?,?\\s+([A-Za-z]{3,9})\\s+(\\d{1,2})(?:,?\\s+20\\d{2})?\\b").find(clean)
+        ?: return null
+    val timeMatch = Regex("(?i)\\b(1[0-2]|0?[1-9])(?::([0-5]\\d))?\\s*(AM|PM)\\b").find(clean)
+        ?: return null
+    val hour = timeMatch.groupValues[1].toInt()
+    val minute = timeMatch.groupValues[2].ifBlank { "00" }
+    val suffix = timeMatch.groupValues[3].uppercase()
+    val converted = when {
+        suffix == "AM" && hour == 12 -> 0
+        suffix == "PM" && hour != 12 -> hour + 12
+        else -> hour
+    }
+    return "${dateMatch.groupValues[1].take(3)} ${dateMatch.groupValues[3]} ${dateMatch.groupValues[2].take(3)} • %02d:%s".format(converted, minute)
 }
 
 private fun fetchWorldwideSearchResults(fixture: String): List<WebResult> {
