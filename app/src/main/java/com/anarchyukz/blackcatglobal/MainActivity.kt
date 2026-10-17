@@ -101,6 +101,7 @@ private val guidePages = listOf(
     "TV Guide UK" to "https://www.tvguide.co.uk/sport/football/sunderland",
     "Where's The Match" to "https://www.wheresthematch.com/Football/Sunderland.asp",
     "Live Soccer TV" to "https://www.livesoccertv.com/teams/england/sunderland/",
+    "EntertainmentBox" to "https://entertainmentbox.com/football/sunderland",
     "FourFourTwo" to "https://www.fourfourtwo.com/features"
 )
 
@@ -140,7 +141,7 @@ private fun BlackCatApp() {
     val channels = remember(data) {
         (data?.guides.orEmpty().flatMap { it.channels } +
             data?.searchResults.orEmpty().flatMap { it.channels })
-            .map { it.trim() }
+            .map { canonicalChannelName(it.trim()) }
             .filter { it.isNotBlank() }
             .distinctBy { it.lowercase() }
     }
@@ -732,6 +733,17 @@ private fun fetchWorldwideSearchResults(fixture: String): List<WebResult> {
     } catch (_: Exception) { }
 
     return results.distinctBy { it.title.lowercase() }.take(12)
+}
+
+private fun canonicalChannelName(raw: String): String {
+    // Merge spelling/branding aliases across guide sites and search engines.
+    return when (raw.trim().lowercase()) {
+        "amazon prime", "prime video" -> "Prime Video"
+        "now tv", "now" -> "NOW"
+        "hbo max" -> "HBO Max"
+        "bein sports" -> "beIN SPORTS"
+        else -> raw.trim()
+    }
 }
 
 private fun findFixtureContainer(anchor: org.jsoup.nodes.Element): org.jsoup.nodes.Element? {
