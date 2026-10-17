@@ -360,6 +360,7 @@ private fun BlackCatApp() {
                                 "Try refreshing later. A listing is not a guarantee that a channel will show the match in your region.")
                         } else channels.forEachIndexed { index, channel -> ChannelRow(channel, index + 1) }
 
+                    }
                     2 -> {
                         SectionHeader("TEAM & LINE-UPS", "Confirmed match-day line-ups when published")
                         if (data?.lineups.isNullOrEmpty()) {
