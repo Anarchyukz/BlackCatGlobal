@@ -81,7 +81,7 @@ private data class GuideResult(
     val url: String
 )
 
-private data class WebResult(val title: String, val snippet: String, val source: String, val channels: List<String>)
+private data class WebResult(val title: String, val snippet: String, val source: String, val region: String, val channels: List<String>)
 
 private data class LineupTeam(
     val name: String,
@@ -121,8 +121,15 @@ private val broadcasterTerms = listOf(
     // Asia and Oceania
     "JioHotstar", "Star Sports", "Sony Sports Network", "Astro SuperSport",
     "SPOTV", "TrueVisions", "Optus Sport", "Sky Sport NZ", "Stan Sport",
-    // Common broadcaster families / listings
-    "HBO Max", "Peacock", "Paramount+", "Setanta Sports", "Disney+", "HBO MAX"
+    // Match-specific international channels that are easy to miss in broad searches
+    "Sky Sport HD 9", "Sky Sport Premier League", "Canal+ Live 2", "Canal+ Extra 5",
+    "V Sport 1", "V Sport Premier League", "NBCSN Extra", "NBCSN", "NBC",
+    "Canal+ App", "Sky Go", "WOW", "NOW Sports", "NOW Sports Membership",
+    // Common broadcaster families / listings and streaming services
+    "HBO Max", "Peacock", "Paramount+", "Setanta Sports", "Disney+", "HBO MAX",
+    "Fubo TV Canada", "FuboTV", "Fubo", "Optus Sport", "Viaplay", "DAZN",
+    "Stan Sport", "JioHotstar", "Sky Sports App", "Canal+ streaming", "ESPN+",
+    "TOD", "StarHub TV", "SuperSport", "TNT Sports", "USA Network", "Sky Sports+"
 )
 
 private val guidePages = listOf(
@@ -380,11 +387,24 @@ private fun BlackCatApp() {
                         }
                     }
                     1 -> {
-                        SectionHeader("WORLDWIDE TV CHANNELS", "Broadcaster names collected from guide pages and web searches")
+                        SectionHeader("WORLDWIDE TV CHANNELS", "Actual named channels found in public match listings")
                         if (channels.isEmpty()) {
                             InfoPanel(if (loading) "Searching listings…" else "No broadcaster names found",
                                 "Try refreshing later. A listing is not a guarantee that a channel will show the match in your region.")
                         } else channels.forEachIndexed { index, channel -> ChannelRow(channel, index + 1) }
+
+                        val streamingServices = remember(data) {
+                            data?.searchResults.orEmpty().flatMap { it.channels }
+                                .filter { isStreamingService(it) }
+                                .map { canonicalChannelName(it) }
+                                .distinctBy { it.lowercase() }
+                                .sortedBy { it.lowercase() }
+                        }
+                        SectionHeader("STREAMING SERVICES", "Apps and online services listed separately from TV channels")
+                        if (streamingServices.isEmpty()) {
+                            InfoPanel("No streaming services identified yet",
+                                "The app searches for match-specific service listings as well as TV channels.")
+                        } else streamingServices.forEachIndexed { index, service -> ChannelRow(service, index + 1) }
 
                     }
                     2 -> {
@@ -473,7 +493,7 @@ private fun BlackCatApp() {
                                 Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
                                     Text(result.title, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
                                     Text(result.snippet, color = Muted, fontSize = 12.sp, lineHeight = 17.sp)
-                                    Text("Source: ${result.source}", color = CatRed, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                    Text("Source: ${result.source} · Search area: ${result.region}", color = CatRed, fontSize = 10.sp, fontWeight = FontWeight.Bold)
                                 }
                             }
                         }
@@ -1115,29 +1135,35 @@ private fun extractGoogleKickoff(text: String): String? {
 }
 
 private fun fetchWorldwideSearchResults(fixture: String): List<WebResult> {
-    // Search several distinct phrasings so international rights pages are not missed
-    // by relying on one exact-match query. Keep the fixture in every query to reduce noise.
+    // Search match-specific listings by region, not just general Premier League rights pages.
+    // Search areas are labels for the query, not claims that every result is confirmed in that territory.
     val queries = listOf(
-        "\"$fixture\" international TV broadcast channels worldwide football",
-        "\"$fixture\" where to watch TV channel USA Canada Australia India Africa Europe",
-        "\"$fixture\" live soccer TV broadcast rights broadcaster international"
+        "Worldwide" to "\"$fixture\" international TV broadcast channels worldwide football",
+        "Worldwide" to "\"$fixture\" live soccer TV broadcast rights broadcaster international",
+        "UK / Ireland" to "\"$fixture\" UK TV channel Sky Sports+ coverage time",
+        "USA / Canada" to "\"$fixture\" watch live USA NBC Peacock Canada Fubo match listing",
+        "Australia / New Zealand" to "\"$fixture\" Australia Optus Sport Stan Sport New Zealand Sky Sport match",
+        "Europe" to "\"$fixture\" Germany Austria Sky Sport WOW France Canal+ Spain DAZN Netherlands Viaplay Italy NOW",
+        "Nordics / Poland" to "\"$fixture\" Sweden Norway Denmark Viaplay V Sport Poland Canal+ Extra match",
+        "Africa / Asia" to "\"$fixture\" SuperSport beIN SPORTS JioHotstar StarHub TV live match"
     )
     val results = mutableListOf<WebResult>()
     val agent = "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/124.0 Mobile Safari/537.36"
 
-    for ((queryIndex, query) in queries.withIndex()) {
+    for ((region, query) in queries) {
         try {
             val google = Jsoup.connect("https://www.google.com/search?q=" + enc(query) + "&num=6")
                 .userAgent(agent)
-                .timeout(8000)
+                .timeout(5500)
                 .get()
             google.select("div.MjjYud").forEach { block ->
                 val title = block.selectFirst("h3")?.text()?.trim().orEmpty()
                 val snippet = block.selectFirst("div.VwiC3b, div[data-sncf], span.aCOpRe")?.text()?.trim().orEmpty()
                 if (title.isNotBlank() && snippet.isNotBlank()) {
                     val combined = "$title $snippet"
-                    val found = broadcasterTerms.filter { combined.contains(it, ignoreCase = true) }.distinct()
-                    results.add(WebResult(title, snippet, "Google", found))
+                    val found = broadcasterTerms.filter { combined.contains(it, ignoreCase = true) }
+                        .distinctBy { it.lowercase() }
+                    results.add(WebResult(title, snippet, "Google", region, found))
                 }
             }
         } catch (_: Exception) { }
@@ -1145,21 +1171,23 @@ private fun fetchWorldwideSearchResults(fixture: String): List<WebResult> {
         try {
             val bing = Jsoup.connect("https://www.bing.com/search?q=" + enc(query) + "&count=6")
                 .userAgent(agent)
-                .timeout(8000)
+                .timeout(5500)
                 .get()
             bing.select("li.b_algo").forEach { block ->
                 val title = block.selectFirst("h2")?.text()?.trim().orEmpty()
                 val snippet = block.selectFirst("p")?.text()?.trim().orEmpty()
                 if (title.isNotBlank() && snippet.isNotBlank()) {
                     val combined = "$title $snippet"
-                    val found = broadcasterTerms.filter { combined.contains(it, ignoreCase = true) }.distinct()
-                    results.add(WebResult(title, snippet, "Bing", found))
+                    val found = broadcasterTerms.filter { combined.contains(it, ignoreCase = true) }
+                        .distinctBy { it.lowercase() }
+                    results.add(WebResult(title, snippet, "Bing", region, found))
                 }
             }
         } catch (_: Exception) { }
     }
 
-    return results.distinctBy { it.title.lowercase() }.take(24)
+    // Keep a larger set because each regional query can reveal a different official listing.
+    return results.distinctBy { (it.title + "|" + it.region).lowercase() }.take(48)
 }
 
 private data class GitHubUpdate(val tag: String, val versionCode: Int, val downloadUrl: String)
@@ -1193,13 +1221,20 @@ private fun checkForGitHubUpdate(): GitHubUpdate? {
     }
 }
 
+private fun isStreamingService(raw: String): Boolean {
+    val value = raw.trim().lowercase()
+    return listOf(
+        "peacock", "fubo", "optus sport", "viaplay", "dazn", "stan sport",
+        "jiohotstar", "paramount+", "disney+", "hbo max", "now", "sky go",
+        "sky sports app", "canal+ app", "canal+ streaming", "wow", "tod",
+        "starhub tv", "espn+", "amazon prime", "prime video", "apple tv"
+    ).any { value == it || value.startsWith("$it ") || value.endsWith(" $it") }
+}
+
 private fun isStreamingPlatformNotChannel(raw: String): Boolean {
-    // These are apps/services, not the TV channel carrying a match.
-    // Keep named sports channels such as Sky Sports Football and Sky Sports+.
-    return raw.trim().lowercase() in setOf(
-        "amazon prime", "amazon prime video", "prime video", "prime tv",
-        "apple tv", "fubo", "now", "now tv", "disney+"
-    )
+    // Services are shown in a separate section; keep actual linear TV channels here.
+    // Sky Sports+ and named channels such as NBCSN Extra remain eligible.
+    return isStreamingService(raw)
 }
 
 private fun canonicalChannelName(raw: String): String {
@@ -1207,6 +1242,12 @@ private fun canonicalChannelName(raw: String): String {
     return when (raw.trim().lowercase()) {
         "hbo max" -> "HBO Max"
         "bein sports" -> "beIN SPORTS"
+        "fubotv" -> "Fubo"
+        "fubo tv canada" -> "Fubo"
+        "sky sports+" -> "Sky Sports+"
+        "sky sport hd 9" -> "Sky Sport HD 9"
+        "canal+ live 2" -> "Canal+ Live 2"
+        "canal+ extra 5" -> "Canal+ Extra 5"
         else -> raw.trim()
     }
 }
