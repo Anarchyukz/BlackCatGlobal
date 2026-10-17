@@ -1,6 +1,8 @@
 package com.anarchyukz.blackcatglobal
 
 import android.os.Bundle
+import android.content.Intent
+import android.net.Uri
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import com.google.firebase.analytics.FirebaseAnalytics
@@ -25,6 +27,8 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.SportsSoccer
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -39,6 +43,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -48,6 +53,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.jsoup.Jsoup
 import java.net.URLEncoder
@@ -150,6 +156,10 @@ private fun BlackCatApp() {
             .distinctBy { it.lowercase() }
     }
     var analyticsSnapshotLogged by remember { mutableStateOf(false) }
+    var checkingUpdate by remember { mutableStateOf(false) }
+    var updateMessage by remember { mutableStateOf<String?>(null) }
+    var updateInfo by remember { mutableStateOf<GitHubUpdate?>(null) }
+    val scope = rememberCoroutineScope()
 
     LaunchedEffect(data) {
         if (data != null && !analyticsSnapshotLogged) {
@@ -302,6 +312,57 @@ private fun BlackCatApp() {
                     Spacer(Modifier.height(4.dp))
                     Text(previousTime, color = Muted, fontSize = 12.sp)
                 }
+            }
+            Spacer(Modifier.height(20.dp))
+            Button(
+                onClick = {
+                    if (!checkingUpdate) {
+                        checkingUpdate = true
+                        updateMessage = null
+                        scope.launch {
+                            val result = withContext(Dispatchers.IO) { checkForGitHubUpdate() }
+                            checkingUpdate = false
+                            updateInfo = result
+                            updateMessage = when {
+                                result == null -> "Couldn't check for updates. Check your internet connection and try again."
+                                result.versionCode > BuildConfig.VERSION_CODE -> null
+                                else -> "You're using the latest version."
+                            }
+                            FirebaseAnalytics.getInstance(context).logEvent("update_check", Bundle().apply {
+                                putBoolean("update_available", result != null && result.versionCode > BuildConfig.VERSION_CODE)
+                            })
+                        }
+                    }
+                },
+                enabled = !checkingUpdate,
+                colors = ButtonDefaults.buttonColors(containerColor = CatRed)
+            ) {
+                if (checkingUpdate) {
+                    CircularProgressIndicator(modifier = Modifier.width(18.dp).height(18.dp), strokeWidth = 2.dp, color = Color.White)
+                    Spacer(Modifier.width(8.dp))
+                }
+                Text(if (checkingUpdate) "Checking for updates…" else "Check for updates")
+            }
+            updateMessage?.let {
+                Spacer(Modifier.height(8.dp))
+                Text(it, color = Muted, fontSize = 12.sp, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+            }
+            if (updateInfo != null && updateInfo!!.versionCode > BuildConfig.VERSION_CODE) {
+                AlertDialog(
+                    onDismissRequest = { updateInfo = null },
+                    title = { Text("Update available") },
+                    text = { Text("Black Cat Global ${updateInfo!!.tag} is available. Your current version is ${BuildConfig.VERSION_NAME}. Open the APK download page to install the update.") },
+                    confirmButton = {
+                        TextButton(onClick = {
+                            val url = updateInfo!!.downloadUrl
+                            updateInfo = null
+                            context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+                        }) { Text("Download update") }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { updateInfo = null }) { Text("Not now") }
+                    }
+                )
             }
             Spacer(Modifier.height(12.dp))
             Text("Listings refresh automatically", color = Muted, fontSize = 12.sp)
@@ -751,6 +812,37 @@ private fun fetchWorldwideSearchResults(fixture: String): List<WebResult> {
     } catch (_: Exception) { }
 
     return results.distinctBy { it.title.lowercase() }.take(12)
+}
+
+private data class GitHubUpdate(val tag: String, val versionCode: Int, val downloadUrl: String)
+
+private fun checkForGitHubUpdate(): GitHubUpdate? {
+    return try {
+        val body = Jsoup.connect("https://api.github.com/repos/Anarchyukz/BlackCatGlobal/releases/latest")
+            .ignoreContentType(true)
+            .header("Accept", "application/vnd.github+json")
+            .userAgent("BlackCatGlobal-Android")
+            .timeout(12000)
+            .execute().body()
+        val release = org.json.JSONObject(body)
+        val tag = release.optString("tag_name", "")
+        val versionCode = Regex("(\\d+)$").find(tag)?.groupValues?.get(1)?.toIntOrNull()
+            ?: return null
+        val assets = release.optJSONArray("assets") ?: return null
+        var apkUrl: String? = null
+        for (i in 0 until assets.length()) {
+            val asset = assets.optJSONObject(i) ?: continue
+            val name = asset.optString("name", "")
+            if (name.endsWith(".apk", ignoreCase = true)) {
+                apkUrl = asset.optString("browser_download_url", "").takeIf { it.startsWith("https://") }
+                if (apkUrl != null) break
+            }
+        }
+        val url = apkUrl ?: release.optString("html_url", "").takeIf { it.startsWith("https://") } ?: return null
+        GitHubUpdate(tag, versionCode, url)
+    } catch (_: Exception) {
+        null
+    }
 }
 
 private fun canonicalChannelName(raw: String): String {
