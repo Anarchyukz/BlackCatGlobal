@@ -823,7 +823,8 @@ private fun loadDashboard(context: android.content.Context): DashboardData {
         if (!kickoff.isNullOrBlank()) fixtureSource = "Google match listing"
     }
 
-    val searchResults = if (fixture != null) fetchWorldwideSearchResults(fixture) else emptyList()
+    val searchResults = (if (fixture != null) fetchWorldwideSearchResults(fixture) else emptyList()) +
+        (if (fixture != null) curatedBroadcastResults(fixture) else emptyList())
     val lineups = if (fixture != null) fetchLineups(fixture) else emptyList()
     val squadPlayers = fetchPremierLeagueSquad()
 
@@ -1132,6 +1133,33 @@ private fun extractGoogleKickoff(text: String): String? {
         else -> hour
     }
     return "${dateMatch.groupValues[1].take(3)} ${dateMatch.groupValues[3]} ${dateMatch.groupValues[2].take(3)} • %02d:%s".format(converted, minute)
+}
+
+// Structured, match-specific broadcaster data supplied for the Sunderland v Bournemouth example.
+ // These are presented as leads, not independently verified rights confirmations.
+private fun curatedBroadcastResults(fixture: String): List<WebResult> {
+    val hasSunderland = fixture.contains("Sunderland", ignoreCase = true)
+    val hasBournemouth = fixture.contains("Bournemouth", ignoreCase = true)
+    if (!hasSunderland || !hasBournemouth) return emptyList()
+
+    val matchLabel = "Sunderland v Bournemouth"
+    val broadcasts = listOf(
+        "United Kingdom & Ireland" to listOf("Sky Sports+", "NOW"),
+        "United States" to listOf("Peacock", "NBCSN", "fuboTV"),
+        "Canada" to listOf("DAZN Canada", "fuboTV Canada"),
+        "Caribbean & South America" to listOf("Disney+ Premium Caribbean"),
+        "Scandinavia / Nordic" to listOf("V Sport channels", "Viaplay"),
+        "Greece" to listOf("Nova Sports Start")
+    )
+    return broadcasts.map { (region, platforms) ->
+        WebResult(
+            title = "$matchLabel — broadcast options",
+            snippet = "Listed platforms: ${platforms.joinToString(", ")}. Match-specific data supplied to the app; confirm local availability and rights before kick-off.",
+            source = "Structured broadcast data (unverified)",
+            region = region,
+            channels = platforms
+        )
+    }
 }
 
 private fun fetchWorldwideSearchResults(fixture: String): List<WebResult> {
