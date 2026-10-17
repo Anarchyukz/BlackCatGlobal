@@ -359,29 +359,7 @@ private fun BlackCatApp() {
                             InfoPanel(if (loading) "Searching listings…" else "No broadcaster names found",
                                 "Try refreshing later. A listing is not a guarantee that a channel will show the match in your region.")
                         } else channels.forEachIndexed { index, channel -> ChannelRow(channel, index + 1) }
-                        SectionHeader("GUIDE SOURCES", "Open a source to check its own listing")
-                        if (data?.guides.isNullOrEmpty()) InfoPanel("Guide pages unavailable", "The app will retry automatically.")
-                        else data!!.guides.forEach { guide ->
-                            Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = Panel)) {
-                                Row(Modifier.fillMaxWidth().padding(14.dp), verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                                    Box(Modifier.background(Color(0xFF302126), RoundedCornerShape(10.dp)).padding(10.dp)) {
-                                        Icon(Icons.Filled.Public, contentDescription = null, tint = Color(0xFFFF8B93))
-                                    }
-                                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                                        Text(guide.name, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                                        Text(guide.channels.takeIf { it.isNotEmpty() }?.joinToString(" · ") ?: "No channel name extracted",
-                                            color = Muted, fontSize = 11.sp, maxLines = 2)
-                                    }
-                                    androidx.compose.material3.IconButton(onClick = {
-                                        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(guide.url)))
-                                    }) { Icon(Icons.Filled.OpenInNew, contentDescription = "Open ${guide.name}", tint = CatRed) }
-                                }
-                            }
-                        }
-                        Text("Channel names are extracted from public page text and search snippets. They may be incomplete, region-specific or unconfirmed.",
-                            color = Muted, fontSize = 11.sp, lineHeight = 16.sp)
-                    }
+
                     2 -> {
                         SectionHeader("TEAM & LINE-UPS", "Confirmed match-day line-ups when published")
                         if (data?.lineups.isNullOrEmpty()) {
