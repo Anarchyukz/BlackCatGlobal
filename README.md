@@ -5,8 +5,9 @@ A separate, open-source Android app for finding legal worldwide TV coverage of S
 ## Current features
 
 - Shows the next Sunderland fixture it can identify from public football TV guides.
-- Checks TV Guide UK, Where's The Match and Live Soccer TV when you open the app or tap refresh.
+- Checks TV Guide UK, Where's The Match, Live Soccer TV and EntertainmentBox when it refreshes; existing sources are retained rather than added twice.
 - Attempts to extract the fixture, kickoff details and broadcaster names from each guide's public page.
+- Merges channel names across guide pages and Google/Bing results, removing case and common naming-alias duplicates.
 - Includes one-tap Google and Bing searches for worldwide, country-by-country listings using the detected fixture.
 - No fixture form, no manual opponent entry, no background polling, and no streams hosted by the app.
 
