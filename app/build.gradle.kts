@@ -13,8 +13,9 @@ android {
         applicationId = "com.anarchyukz.blackcatglobal"
         minSdk = 24
         targetSdk = 35
-        versionCode = 3
-        versionName = "1.2.0"
+        // CI uses each workflow run number so the app can detect newer GitHub releases.
+        versionCode = System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull() ?: 3
+        versionName = System.getenv("GITHUB_RUN_NUMBER")?.let { "1.2.$it" } ?: "1.2.0"
     }
 
     buildFeatures {
