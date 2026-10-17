@@ -574,14 +574,18 @@ private fun loadDashboard(context: android.content.Context): DashboardData {
         } ?: doc.select("a").firstOrNull { it.text().contains("Sunderland", true) && it.text().length < 100 }
 
         val container = anchor?.let { findFixtureContainer(it) }
-        val context = container?.text()?.replace(Regex("\\s+"), " ")?.take(420)
+        val context = container?.text()?.replace(Regex("\\s+"), " ")?.take(900)
+        // TV-guide sites often put the fixture and broadcaster in sibling cards, not the
+        // same small HTML container. Search progressively larger fixture-related text too.
+        val nearbyText = extractBroadcastersNearFixture(doc, anchor, fixture)
         val linkText = container?.select("a")?.map { it.text().trim() }.orEmpty()
-        val haystack = (context.orEmpty() + " " + linkText.joinToString(" "))
-        val channels = broadcasterTerms.filter { term -> haystack.contains(term, ignoreCase = true) }.distinct()
+        val haystack = (context.orEmpty() + " " + linkText.joinToString(" ") + " " + nearbyText)
+        val channels = broadcasterTerms.filter { term -> haystack.contains(term, ignoreCase = true) }
+            .distinctBy { canonicalChannelName(it).lowercase() }
         GuideResult(
             name = name,
             fixture = anchor?.text()?.replace(Regex("\\s+"), " ")?.takeIf { it.isNotBlank() },
-            context = context?.takeIf { it.isNotBlank() },
+            context = context?.takeIf { it.isNotBlank() } ?: nearbyText.take(420).takeIf { it.isNotBlank() },
             channels = channels,
             url = guidePages.first { it.first == name }.second
         )
@@ -915,6 +919,45 @@ private fun parseEspnLineups(jsonText: String): List<LineupTeam> {
     } catch (_: Exception) {
         emptyList()
     }
+}
+
+/**
+ * Extract broadcaster names even when a guide's HTML separates the match card from
+ * its channel label. It deliberately starts with the fixture's own ancestors and only
+ * falls back to a short nearby body-text window.
+ */
+private fun extractBroadcastersNearFixture(
+    doc: org.jsoup.nodes.Document,
+    anchor: org.jsoup.nodes.Element?,
+    fixture: String?
+): String {
+    var node: org.jsoup.nodes.Element? = anchor
+    repeat(9) {
+        val current = node ?: return@repeat
+        val text = current.text().replace(Regex("\\s+"), " ").trim()
+        if (text.length in 20..2600 &&
+            broadcasterTerms.any { term -> text.contains(term, ignoreCase = true) }) {
+            return text
+        }
+        node = current.parent()
+    }
+
+    val body = doc.body().text().replace(Regex("\\s+"), " ").trim()
+    val candidates = listOfNotNull(
+        anchor?.text()?.takeIf { it.isNotBlank() },
+        fixture?.takeIf { it.isNotBlank() },
+        "Sunderland"
+    )
+    for (candidate in candidates) {
+        val index = body.indexOf(candidate, ignoreCase = true)
+        if (index >= 0) {
+            val start = (index - 900).coerceAtLeast(0)
+            val end = (index + candidate.length + 1300).coerceAtMost(body.length)
+            val nearby = body.substring(start, end)
+            if (broadcasterTerms.any { term -> nearby.contains(term, ignoreCase = true) }) return nearby
+        }
+    }
+    return ""
 }
 
 private fun fetchWorldwideSearchResults(fixture: String): List<WebResult> {
