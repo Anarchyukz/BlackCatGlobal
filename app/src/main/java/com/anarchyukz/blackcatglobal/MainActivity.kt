@@ -109,7 +109,7 @@ private val broadcasterTerms = listOf(
     "Sky Sports", "TNT Sports", "HBO Max", "DAZN", "ESPN", "beIN SPORTS", "beIN Sports",
     "Stan Sport", "SuperSport", "Disney+", "Peacock", "NBC", "USA Network", "Canal+",
     "Setanta Sports", "Paramount+", "JioHotstar", "Star Sports", "Viaplay", "Amazon Prime",
-    "Prime Video", "Apple TV", "Fubo", "Sport TV", "Ziggo Sport", "Eleven Sports",
+    "Prime Video", "Fubo", "Sport TV", "Ziggo Sport", "Eleven Sports",
     "Movistar", "Arena Sport", "DStv", "TOD", "LFCTV", "NOW", "NOW TV", "HBO MAX", "Sky Sports+"
 )
 
@@ -668,11 +668,10 @@ private fun loadDashboard(context: android.content.Context): DashboardData {
         // local card extraction misses them, use the guide's own Sunderland listings
         // as a fallback instead of leaving the app's channel tab completely blank.
         val pageText = doc.body().text().replace(Regex("\\s+"), " ")
-        val channels = if (preciseChannels.isNotEmpty()) preciseChannels else
-            if (pageText.contains("Sunderland", ignoreCase = true))
-                broadcasterTerms.filter { term -> pageText.contains(term, ignoreCase = true) }
-                    .distinctBy { canonicalChannelName(it).lowercase() }
-            else emptyList()
+        // Do not scan the entire page for channel names: that can pick up unrelated
+        // competitions, generic streaming-device references, or site-wide promotions.
+        // Only show broadcaster names found in the fixture's own nearby listing text.
+        val channels = preciseChannels
         GuideResult(
             name = name,
             fixture = anchor?.text()?.replace(Regex("\\s+"), " ")?.takeIf { it.isNotBlank() },
