@@ -352,6 +352,32 @@ private fun BlackCatApp() {
                                 Icon(Icons.Filled.OpenInNew, contentDescription = "Sponsor details", tint = Color(0xFFFF8B93))
                             }
                         }
+
+                        Card(
+                            modifier = Modifier.fillMaxWidth().clickable {
+                                context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://windscribe.com/yo/qxtwefau")))
+                            },
+                            shape = RoundedCornerShape(14.dp),
+                            colors = CardDefaults.cardColors(containerColor = Color(0xFF20232A))
+                        ) {
+                            Row(
+                                Modifier.fillMaxWidth().padding(horizontal = 13.dp, vertical = 11.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                Box(
+                                    Modifier.size(36.dp).background(Color(0xFF263B50), RoundedCornerShape(10.dp)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(Icons.Filled.Public, contentDescription = null, tint = Color(0xFF72C7FF), modifier = Modifier.size(21.dp))
+                                }
+                                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                    Text("WINDscribe VPN", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                                    Text("Want more privacy online? Check out Windscribe via my referral.", color = Muted, fontSize = 11.sp, lineHeight = 14.sp)
+                                }
+                                Icon(Icons.Filled.OpenInNew, contentDescription = "Open Windscribe referral", tint = Color(0xFF72C7FF), modifier = Modifier.size(18.dp))
+                            }
+                        }
                     }
                     1 -> {
                         SectionHeader("WORLDWIDE TV CHANNELS", "Broadcaster names collected from guide pages and web searches")
