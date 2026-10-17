@@ -7,6 +7,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import com.google.firebase.analytics.FirebaseAnalytics
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -15,6 +16,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -35,6 +37,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -151,6 +154,10 @@ private fun BlackCatApp() {
     var checkingUpdate by remember { mutableStateOf(false) }
     var updateMessage by remember { mutableStateOf<String?>(null) }
     var updateInfo by remember { mutableStateOf<GitHubUpdate?>(null) }
+    var sponsorDialogOpen by remember { mutableStateOf(false) }
+    var sponsorName by remember { mutableStateOf("") }
+    var sponsorEmail by remember { mutableStateOf("") }
+    var sponsorMessage by remember { mutableStateOf("") }
     val scope = rememberCoroutineScope()
 
     LaunchedEffect(refreshToken) {
@@ -301,6 +308,29 @@ private fun BlackCatApp() {
                         data?.previousFixture?.let {
                             SectionHeader("LAST LEAGUE MATCH", data.previousKickoff.orEmpty())
                             InfoPanel(it, "Previous Premier League fixture")
+                        }
+
+                        Card(
+                            modifier = Modifier.fillMaxWidth().clickable { sponsorDialogOpen = true },
+                            shape = RoundedCornerShape(18.dp),
+                            colors = CardDefaults.cardColors(containerColor = Color(0xFF252027))
+                        ) {
+                            Row(
+                                Modifier.fillMaxWidth().padding(16.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                Box(Modifier.background(Color(0xFF4A2029), RoundedCornerShape(12.dp)).padding(12.dp)) {
+                                    Icon(Icons.Filled.Public, contentDescription = null, tint = Color(0xFFFFA2A8))
+                                }
+                                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                    Text("SUPPORT BLACK CAT GLOBAL", color = Color(0xFFFFA2A8), fontSize = 10.sp,
+                                        fontWeight = FontWeight.ExtraBold, letterSpacing = 1.2.sp)
+                                    Text("Want to sponsor the app?", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                                    Text("Click for details", color = Muted, fontSize = 12.sp)
+                                }
+                                Icon(Icons.Filled.OpenInNew, contentDescription = "Sponsor details", tint = Color(0xFFFF8B93))
+                            }
                         }
                     }
                     1 -> {
@@ -470,6 +500,58 @@ private fun BlackCatApp() {
                 }
             }
         }
+    }
+
+    if (sponsorDialogOpen) {
+        AlertDialog(
+            onDismissRequest = { sponsorDialogOpen = false },
+            title = { Text("Sponsor Black Cat Global") },
+            text = {
+                Column(
+                    modifier = Modifier.fillMaxWidth().heightIn(max = 440.dp).verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Text("Interested in supporting the app? Tell us a little about yourself and how you would like to work together.",
+                        color = Muted, fontSize = 13.sp, lineHeight = 18.sp)
+                    OutlinedTextField(value = sponsorName, onValueChange = { sponsorName = it },
+                        modifier = Modifier.fillMaxWidth(), singleLine = true, label = { Text("Your name or business") })
+                    OutlinedTextField(value = sponsorEmail, onValueChange = { sponsorEmail = it },
+                        modifier = Modifier.fillMaxWidth(), singleLine = true, label = { Text("Your email address") })
+                    OutlinedTextField(value = sponsorMessage, onValueChange = { sponsorMessage = it },
+                        modifier = Modifier.fillMaxWidth(), minLines = 3, maxLines = 5,
+                        label = { Text("How would you like to sponsor?") })
+                    Text("Tapping Send opens your email app with your message ready to send. Nothing is sent automatically.",
+                        color = Muted, fontSize = 11.sp, lineHeight = 15.sp)
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        val body = buildString {
+                            appendLine("Black Cat Global sponsorship enquiry")
+                            appendLine()
+                            appendLine("Name/business: ${sponsorName.trim().ifBlank { "Not provided" }}")
+                            appendLine("Reply email: ${sponsorEmail.trim().ifBlank { "Not provided" }}")
+                            appendLine()
+                            appendLine(sponsorMessage.trim().ifBlank { "Please contact me about sponsorship." })
+                        }
+                        val intent = Intent(Intent.ACTION_SENDTO, Uri.parse("mailto:gregz2204@gmail.com")).apply {
+                            putExtra(Intent.EXTRA_SUBJECT, "Black Cat Global sponsorship enquiry")
+                            putExtra(Intent.EXTRA_TEXT, body)
+                        }
+                        try {
+                            context.startActivity(intent)
+                            sponsorDialogOpen = false
+                        } catch (_: Exception) {
+                            android.widget.Toast.makeText(context, "No email app is available on this device.", android.widget.Toast.LENGTH_LONG).show()
+                        }
+                    },
+                    enabled = sponsorName.isNotBlank() && sponsorEmail.contains("@") && sponsorMessage.isNotBlank(),
+                    colors = ButtonDefaults.buttonColors(containerColor = CatRed, contentColor = Color.White)
+                ) { Text("Send enquiry") }
+            },
+            dismissButton = { TextButton(onClick = { sponsorDialogOpen = false }) { Text("Cancel") } }
+        )
     }
 
     if (updateInfo != null && updateInfo!!.versionCode > BuildConfig.VERSION_CODE) {
