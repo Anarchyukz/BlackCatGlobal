@@ -106,11 +106,23 @@ private data class DashboardData(
 )
 
 private val broadcasterTerms = listOf(
-    "Sky Sports", "TNT Sports", "HBO Max", "DAZN", "ESPN", "beIN SPORTS", "beIN Sports",
-    "Stan Sport", "SuperSport", "Disney+", "Peacock", "NBC", "USA Network", "Canal+",
-    "Setanta Sports", "Paramount+", "JioHotstar", "Star Sports", "Viaplay",
-    "Sport TV", "Ziggo Sport", "Eleven Sports",
-    "Movistar", "Arena Sport", "DStv", "TOD", "LFCTV", "HBO MAX", "Sky Sports+"
+    // UK and Ireland
+    "Sky Sports", "Sky Sports+", "TNT Sports", "Premier Sports", "Viaplay Sports",
+    "BBC One", "BBC Two", "ITV1", "ITV4", "LFCTV",
+    // North and South America
+    "ESPN", "ESPN+", "ESPN Deportes", "Fox Sports", "FOX Deportes", "CBS Sports Network",
+    "NBC Sports", "USA Network", "Telemundo", "Universo", "TUDN", "Sportsnet", "TSN",
+    "beIN SPORTS", "Canal+", "Claro Sports", "TNT Sports Brasil", "BandSports",
+    // Europe
+    "Ziggo Sport", "Sport TV", "Eleven Sports", "Arena Sport", "Sportklub",
+    "Movistar Plus+", "DAZN", "RTL", "Canal+ Sport", "Sky Sport Austria",
+    // Africa and Middle East
+    "SuperSport", "DStv", "SABC Sport", "Canal+ Afrique", "beIN SPORTS MENA", "TOD",
+    // Asia and Oceania
+    "JioHotstar", "Star Sports", "Sony Sports Network", "Astro SuperSport",
+    "SPOTV", "TrueVisions", "Optus Sport", "Sky Sport NZ", "Stan Sport",
+    // Common broadcaster families / listings
+    "HBO Max", "Peacock", "Paramount+", "Setanta Sports", "Disney+", "HBO MAX"
 )
 
 private val guidePages = listOf(
@@ -1059,42 +1071,51 @@ private fun extractBroadcastersNearFixture(
 }
 
 private fun fetchWorldwideSearchResults(fixture: String): List<WebResult> {
-    val query = "\"$fixture\" football TV channel broadcaster worldwide"
+    // Search several distinct phrasings so international rights pages are not missed
+    // by relying on one exact-match query. Keep the fixture in every query to reduce noise.
+    val queries = listOf(
+        "\"$fixture\" international TV broadcast channels worldwide football",
+        "\"$fixture\" where to watch TV channel USA Canada Australia India Africa Europe",
+        "\"$fixture\" live soccer TV broadcast rights broadcaster international"
+    )
     val results = mutableListOf<WebResult>()
+    val agent = "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/124.0 Mobile Safari/537.36"
 
-    try {
-        val google = Jsoup.connect("https://www.google.com/search?q=" + enc(query) + "&num=10")
-            .userAgent("Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/124.0 Mobile Safari/537.36")
-            .timeout(10000)
-            .get()
-        google.select("div.MjjYud").forEach { block ->
-            val title = block.selectFirst("h3")?.text()?.trim().orEmpty()
-            val snippet = block.selectFirst("div.VwiC3b, div[data-sncf], span.aCOpRe")?.text()?.trim().orEmpty()
-            if (title.isNotBlank() && snippet.isNotBlank()) {
-                val combined = "$title $snippet"
-                val channels = broadcasterTerms.filter { combined.contains(it, ignoreCase = true) }.distinct()
-                results.add(WebResult(title, snippet, "Google", channels))
+    for ((queryIndex, query) in queries.withIndex()) {
+        try {
+            val google = Jsoup.connect("https://www.google.com/search?q=" + enc(query) + "&num=6")
+                .userAgent(agent)
+                .timeout(8000)
+                .get()
+            google.select("div.MjjYud").forEach { block ->
+                val title = block.selectFirst("h3")?.text()?.trim().orEmpty()
+                val snippet = block.selectFirst("div.VwiC3b, div[data-sncf], span.aCOpRe")?.text()?.trim().orEmpty()
+                if (title.isNotBlank() && snippet.isNotBlank()) {
+                    val combined = "$title $snippet"
+                    val found = broadcasterTerms.filter { combined.contains(it, ignoreCase = true) }.distinct()
+                    results.add(WebResult(title, snippet, "Google", found))
+                }
             }
-        }
-    } catch (_: Exception) { }
+        } catch (_: Exception) { }
 
-    try {
-        val bing = Jsoup.connect("https://www.bing.com/search?q=" + enc(query) + "&count=10")
-            .userAgent("Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/124.0 Mobile Safari/537.36")
-            .timeout(10000)
-            .get()
-        bing.select("li.b_algo").forEach { block ->
-            val title = block.selectFirst("h2")?.text()?.trim().orEmpty()
-            val snippet = block.selectFirst("p")?.text()?.trim().orEmpty()
-            if (title.isNotBlank() && snippet.isNotBlank()) {
-                val combined = "$title $snippet"
-                val channels = broadcasterTerms.filter { combined.contains(it, ignoreCase = true) }.distinct()
-                results.add(WebResult(title, snippet, "Bing", channels))
+        try {
+            val bing = Jsoup.connect("https://www.bing.com/search?q=" + enc(query) + "&count=6")
+                .userAgent(agent)
+                .timeout(8000)
+                .get()
+            bing.select("li.b_algo").forEach { block ->
+                val title = block.selectFirst("h2")?.text()?.trim().orEmpty()
+                val snippet = block.selectFirst("p")?.text()?.trim().orEmpty()
+                if (title.isNotBlank() && snippet.isNotBlank()) {
+                    val combined = "$title $snippet"
+                    val found = broadcasterTerms.filter { combined.contains(it, ignoreCase = true) }.distinct()
+                    results.add(WebResult(title, snippet, "Bing", found))
+                }
             }
-        }
-    } catch (_: Exception) { }
+        } catch (_: Exception) { }
+    }
 
-    return results.distinctBy { it.title.lowercase() }.take(12)
+    return results.distinctBy { it.title.lowercase() }.take(24)
 }
 
 private data class GitHubUpdate(val tag: String, val versionCode: Int, val downloadUrl: String)
