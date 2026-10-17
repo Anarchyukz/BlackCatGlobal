@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
@@ -23,6 +24,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Public
+import androidx.compose.material.icons.filled.Groups
+import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.OpenInNew
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.SportsSoccer
 import androidx.compose.material3.Button
@@ -132,34 +137,53 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+
 @Composable
 private fun BlackCatApp() {
     val context = LocalContext.current
     var loading by remember { mutableStateOf(true) }
     var dashboard by remember { mutableStateOf<DashboardData?>(null) }
-
-    LaunchedEffect(Unit) {
-        while (true) {
-            loading = true
-            dashboard = withContext(Dispatchers.IO) { loadDashboard(context) }
-            loading = false
-            kotlinx.coroutines.delay(60_000L)
-        }
-    }
-
-    val data = dashboard
-    val channels = remember(data) {
-        (data?.guides.orEmpty().flatMap { it.channels } +
-            data?.searchResults.orEmpty().flatMap { it.channels })
-            .map { canonicalChannelName(it.trim()) }
-            .filter { it.isNotBlank() }
-            .distinctBy { it.lowercase() }
-    }
+    var refreshToken by remember { mutableIntStateOf(0) }
+    var selectedTab by remember { mutableIntStateOf(0) }
+    var searchQuery by remember { mutableStateOf("") }
     var analyticsSnapshotLogged by remember { mutableStateOf(false) }
     var checkingUpdate by remember { mutableStateOf(false) }
     var updateMessage by remember { mutableStateOf<String?>(null) }
     var updateInfo by remember { mutableStateOf<GitHubUpdate?>(null) }
     val scope = rememberCoroutineScope()
+
+    LaunchedEffect(refreshToken) {
+        loading = true
+        dashboard = withContext(Dispatchers.IO) { loadDashboard(context) }
+        loading = false
+        while (true) {
+            kotlinx.coroutines.delay(60_000L)
+            loading = true
+            dashboard = withContext(Dispatchers.IO) { loadDashboard(context) }
+            loading = false
+        }
+    }
+
+    val data = dashboard
+    val channels = remember(data) {
+        (data?.guides.orEmpty().flatMap { it.channels } + data?.searchResults.orEmpty().flatMap { it.channels })
+            .map { canonicalChannelName(it.trim()) }.filter { it.isNotBlank() }
+            .distinctBy { it.lowercase() }.sortedBy { it.lowercase() }
+    }
+    val filteredChannels = remember(channels, searchQuery) {
+        channels.filter { it.contains(searchQuery.trim(), ignoreCase = true) }
+    }
+    val filteredGuides = remember(data, searchQuery) {
+        data?.guides.orEmpty().filter { searchQuery.isBlank() ||
+            it.name.contains(searchQuery, true) || it.fixture.orEmpty().contains(searchQuery, true) ||
+            it.context.orEmpty().contains(searchQuery, true) ||
+            it.channels.any { channel -> channel.contains(searchQuery, true) } }
+    }
+    val filteredSearchResults = remember(data, searchQuery) {
+        data?.searchResults.orEmpty().filter { searchQuery.isBlank() ||
+            it.title.contains(searchQuery, true) || it.snippet.contains(searchQuery, true) ||
+            it.channels.any { channel -> channel.contains(searchQuery, true) } }
+    }
 
     LaunchedEffect(data) {
         if (data != null && !analyticsSnapshotLogged) {
@@ -174,207 +198,324 @@ private fun BlackCatApp() {
         }
     }
 
-    Surface(modifier = Modifier.fillMaxSize(), color = DeepBackground) {
-        Column(
-            modifier = Modifier.fillMaxSize().statusBarsPadding()
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 22.dp, vertical = 24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Top
-        ) {
-            // Sunderland AFC wordmark supplied by the user, rendered as red monospace text.
-            Text(
-                text = """
-  ____                  _           _                 _      _      _____ ____ 
- / ___| _   _ _ __   __| | ___ _ __| | __ _ _ __   __| |    / \    |  ___/ ___|
- \___ \| | | | '_ \ / _`|/ _ \ '__| |/ _`| '_ \ / _`|   / _ \   | |_ | |    
-  ___) | |_| | | | | (_| |  __/ |  | | (_| | | | | (_| |  / ___ \ _|  _|| |___ 
- |____/ \__,_|_| |_|\__,_|\___|_|  |_|\__,_|_| |_|\__,_| /_/   \_(_)_|(_)\_____|
-                                                                               
-""".trimIndent(),
-                color = CatRed,
-                fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
-                fontSize = 4.2.sp,
-                lineHeight = 4.2.sp,
-                fontWeight = FontWeight.Black,
-                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                modifier = Modifier.fillMaxWidth()
-            )
-            Spacer(Modifier.height(16.dp))
-            Text("BLACK CAT GLOBAL", fontSize = 23.sp, fontWeight = FontWeight.Black,
-                color = Color.White, letterSpacing = 1.2.sp)
-            Spacer(Modifier.height(32.dp))
-
-            if (loading && data == null) {
-                CircularProgressIndicator(color = CatRed)
-                Spacer(Modifier.height(16.dp))
-                Text("Finding the next Sunderland match…", color = Muted, fontSize = 15.sp)
-            } else {
-                Text("SUNDERLAND", fontSize = 12.sp, color = CatRed,
-                    fontWeight = FontWeight.ExtraBold, letterSpacing = 2.4.sp)
-                Spacer(Modifier.height(12.dp))
-                Text(data?.fixture ?: "Fixture unavailable",
-                    fontSize = 27.sp, fontWeight = FontWeight.ExtraBold,
-                    color = Color.White, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
-                data?.kickoff?.let {
-                    Spacer(Modifier.height(9.dp))
-                    Text(it, color = Muted, fontSize = 14.sp)
-                }
-                Spacer(Modifier.height(30.dp))
-                Text("WATCH ON", fontSize = 12.sp, color = CatRed,
-                    fontWeight = FontWeight.ExtraBold, letterSpacing = 2.4.sp)
-                Spacer(Modifier.height(12.dp))
-                if (channels.isEmpty()) {
-                    Text(
-                        if (loading) "Checking worldwide TV listings…" else "TV channels not confirmed yet",
-                        color = Muted, fontSize = 16.sp,
-                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
+    Surface(Modifier.fillMaxSize(), color = DeepBackground) {
+        androidx.compose.material3.Scaffold(
+            modifier = Modifier.fillMaxSize().statusBarsPadding(),
+            containerColor = DeepBackground,
+            bottomBar = {
+                androidx.compose.material3.NavigationBar(containerColor = Panel, contentColor = Color.White) {
+                    val items = listOf(
+                        Triple("Match", Icons.Filled.SportsSoccer, 0),
+                        Triple("TV", Icons.Filled.Public, 1),
+                        Triple("Team", Icons.Filled.Groups, 2),
+                        Triple("Results", Icons.Filled.History, 3),
+                        Triple("Search", Icons.Filled.Search, 4)
                     )
-                } else {
-                    Text(channels.joinToString("  •  "), color = Color.White,
-                        fontSize = 20.sp, fontWeight = FontWeight.Bold,
-                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                        lineHeight = 29.sp)
-                }
-            }
-                Spacer(Modifier.height(30.dp))
-                Text("TEAM LINE-UPS", fontSize = 12.sp, color = CatRed,
-                    fontWeight = FontWeight.ExtraBold, letterSpacing = 2.4.sp)
-                Spacer(Modifier.height(12.dp))
-                if (data?.lineups.isNullOrEmpty()) {
-                    Text(
-                        "Confirmed starting line-ups are not available yet.",
-                        color = Muted, fontSize = 14.sp,
-                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                        lineHeight = 21.sp
-                    )
-                    if (!data?.squadPlayers.isNullOrEmpty()) {
-                        Spacer(Modifier.height(14.dp))
-                        Text("PREMIER LEAGUE SQUAD", color = Color.White,
-                            fontSize = 13.sp, fontWeight = FontWeight.ExtraBold,
-                            letterSpacing = 1.2.sp)
-                        Spacer(Modifier.height(4.dp))
-                        Text("Registered first-team squad • not the match-day starting XI",
-                            color = Muted, fontSize = 12.sp,
-                            textAlign = androidx.compose.ui.text.style.TextAlign.Center)
-                        Spacer(Modifier.height(8.dp))
-                        Text(data!!.squadPlayers.joinToString("\n"), color = Color.White,
-                            fontSize = 14.sp, lineHeight = 21.sp,
-                            textAlign = androidx.compose.ui.text.style.TextAlign.Center)
-                    }
-                } else {
-                    data!!.lineups.forEach { team ->
-                        Spacer(Modifier.height(8.dp))
-                        Text(team.name.uppercase(), color = Color.White,
-                            fontSize = 15.sp, fontWeight = FontWeight.ExtraBold)
-                        team.formation?.let {
-                            Text("Formation: $it", color = Muted, fontSize = 12.sp)
-                        }
-                        Spacer(Modifier.height(5.dp))
-                        Text("STARTING XI", color = CatRed, fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold, letterSpacing = 1.2.sp)
-                        Text(team.starters.joinToString("\n"), color = Color.White,
-                            fontSize = 14.sp, lineHeight = 20.sp,
-                            textAlign = androidx.compose.ui.text.style.TextAlign.Center)
-                        if (team.substitutes.isNotEmpty()) {
-                            Spacer(Modifier.height(8.dp))
-                            Text("SUBSTITUTES", color = CatRed, fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold, letterSpacing = 1.2.sp)
-                            Text(team.substitutes.joinToString("\n"), color = Muted,
-                                fontSize = 13.sp, lineHeight = 19.sp,
-                                textAlign = androidx.compose.ui.text.style.TextAlign.Center)
-                        }
+                    items.forEach { item ->
+                        androidx.compose.material3.NavigationBarItem(
+                            selected = selectedTab == item.third,
+                            onClick = { selectedTab = item.third },
+                            icon = { Icon(item.second, contentDescription = item.first) },
+                            label = { Text(item.first, fontSize = 10.sp, maxLines = 1) },
+                            colors = androidx.compose.material3.NavigationBarItemDefaults.colors(
+                                selectedIconColor = CatRed, selectedTextColor = Color.White,
+                                indicatorColor = Color(0xFF3B2027), unselectedIconColor = Muted,
+                                unselectedTextColor = Muted
+                            )
+                        )
                     }
                 }
-            Spacer(Modifier.height(24.dp))
-            data?.previousFixture?.let { previous ->
-                Spacer(Modifier.height(20.dp))
-                Text("PREVIOUS PREMIER LEAGUE MATCH", fontSize = 11.sp, color = Muted,
-                    fontWeight = FontWeight.ExtraBold, letterSpacing = 2.sp)
-                Spacer(Modifier.height(7.dp))
-                Text(previous, fontSize = 16.sp, fontWeight = FontWeight.Bold,
-                    color = Color.White,
-                    textAlign = androidx.compose.ui.text.style.TextAlign.Center)
-                data.previousKickoff?.let { previousTime ->
-                    Spacer(Modifier.height(4.dp))
-                    Text(previousTime, color = Muted, fontSize = 12.sp)
-                }
             }
-            data?.previousCupFixture?.let { previous ->
-                Spacer(Modifier.height(20.dp))
-                Text("PREVIOUS CUP / EUROPE MATCH", fontSize = 11.sp, color = Muted,
-                    fontWeight = FontWeight.ExtraBold, letterSpacing = 2.sp)
-                Spacer(Modifier.height(7.dp))
-                Text(previous, fontSize = 16.sp, fontWeight = FontWeight.Bold,
-                    color = Color.White,
-                    textAlign = androidx.compose.ui.text.style.TextAlign.Center)
-                data.previousCupKickoff?.let { previousTime ->
-                    Spacer(Modifier.height(4.dp))
-                    Text(previousTime, color = Muted, fontSize = 12.sp)
-                }
-            }
-            Spacer(Modifier.height(20.dp))
-            Button(
-                onClick = {
-                    if (!checkingUpdate) {
-                        checkingUpdate = true
-                        updateMessage = null
-                        scope.launch {
-                            val result = withContext(Dispatchers.IO) { checkForGitHubUpdate() }
-                            checkingUpdate = false
-                            updateInfo = result
-                            updateMessage = when {
-                                result == null -> "Couldn't check for updates. Check your internet connection and try again."
-                                result.versionCode > BuildConfig.VERSION_CODE -> null
-                                else -> "You're using the latest version."
-                            }
-                            FirebaseAnalytics.getInstance(context).logEvent("update_check", Bundle().apply {
-                                putBoolean("update_available", result != null && result.versionCode > BuildConfig.VERSION_CODE)
-                            })
-                        }
-                    }
-                },
-                enabled = !checkingUpdate,
-                colors = ButtonDefaults.buttonColors(containerColor = CatRed)
+        ) { scaffoldPadding ->
+            Column(
+                modifier = Modifier.fillMaxSize().padding(scaffoldPadding)
+                    .verticalScroll(rememberScrollState()).padding(horizontal = 18.dp, vertical = 14.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                if (checkingUpdate) {
-                    CircularProgressIndicator(modifier = Modifier.width(18.dp).height(18.dp), strokeWidth = 2.dp, color = Color.White)
-                    Spacer(Modifier.width(8.dp))
-                }
-                Text(if (checkingUpdate) "Checking for updates…" else "Check for updates")
-            }
-            updateMessage?.let {
-                Spacer(Modifier.height(8.dp))
-                Text(it, color = Muted, fontSize = 12.sp, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
-            }
-            if (updateInfo != null && updateInfo!!.versionCode > BuildConfig.VERSION_CODE) {
-                AlertDialog(
-                    onDismissRequest = { updateInfo = null },
-                    title = { Text("Update available") },
-                    text = { Text("Black Cat Global ${updateInfo!!.tag} is available. Your current version is ${BuildConfig.VERSION_NAME}. Open the APK download page to install the update.") },
-                    confirmButton = {
-                        TextButton(onClick = {
-                            val url = updateInfo!!.downloadUrl
-                            updateInfo = null
-                            context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
-                        }) { Text("Download update") }
-                    },
-                    dismissButton = {
-                        TextButton(onClick = { updateInfo = null }) { Text("Not now") }
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Box(Modifier.background(CatRed, RoundedCornerShape(12.dp)).padding(horizontal = 10.dp, vertical = 8.dp)) {
+                            Text("BC", color = Color.White, fontWeight = FontWeight.Black, fontSize = 18.sp)
+                        }
+                        Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
+                            Text("BLACK CAT", color = Color.White, fontWeight = FontWeight.Black, fontSize = 19.sp, letterSpacing = 1.1.sp)
+                            Text("GLOBAL  •  SUNDERLAND AFC", color = Muted, fontSize = 9.sp, letterSpacing = 1.1.sp)
+                        }
                     }
-                )
+                    androidx.compose.material3.IconButton(onClick = { refreshToken++ }) {
+                        Icon(Icons.Filled.Refresh, contentDescription = "Refresh listings", tint = if (loading) CatRed else Muted)
+                    }
+                }
+
+                when (selectedTab) {
+                    0 -> {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Box(Modifier.size(8.dp).background(CatRed, RoundedCornerShape(50)))
+                            Text(if (loading) "UPDATING MATCH CENTRE" else "MATCH CENTRE", color = CatRed, fontWeight = FontWeight.ExtraBold, fontSize = 11.sp, letterSpacing = 1.8.sp)
+                            Spacer(Modifier.weight(1f))
+                            Text("AUTO REFRESH · 60 SEC", color = Muted, fontSize = 9.sp)
+                        }
+                        Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(24.dp),
+                            colors = CardDefaults.cardColors(containerColor = Panel),
+                            elevation = CardDefaults.cardElevation(defaultElevation = 3.dp)) {
+                            Column(
+                                Modifier.fillMaxWidth().background(
+                                    androidx.compose.ui.graphics.Brush.linearGradient(listOf(Color(0xFF3A1820), Color(0xFF21191F), Panel))
+                                ).padding(20.dp),
+                                verticalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                Text("NEXT FIXTURE", color = Color(0xFFFFA2A8), fontSize = 11.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 2.sp)
+                                Text(data?.fixture ?: if (loading) "Finding Sunderland's next match…" else "Fixture unavailable",
+                                    color = Color.White, fontSize = 27.sp, lineHeight = 32.sp, fontWeight = FontWeight.Black)
+                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    Icon(Icons.Filled.SportsSoccer, contentDescription = null, tint = CatRed, modifier = Modifier.size(19.dp))
+                                    Text(data?.kickoff ?: "Kick-off time will appear when confirmed", color = Muted, fontSize = 13.sp)
+                                }
+                                androidx.compose.material3.HorizontalDivider(color = Color(0xFF4B343A))
+                                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween) {
+                                    Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                                        Text("WORLDWIDE TV", color = Muted, fontSize = 10.sp, letterSpacing = 1.3.sp, fontWeight = FontWeight.Bold)
+                                        Text("${channels.size} channel${if (channels.size == 1) "" else "s"} found", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                                    }
+                                    androidx.compose.material3.TextButton(onClick = { selectedTab = 1 }) {
+                                        Text("View channels  ›", color = Color(0xFFFF8B93), fontWeight = FontWeight.Bold)
+                                    }
+                                }
+                            }
+                        }
+                        SectionHeader("BROADCAST SNAPSHOT", "Names found in public listings and web results")
+                        if (channels.isEmpty()) {
+                            InfoPanel(if (loading) "Checking worldwide listings" else "No channels found yet",
+                                "Listings can vary by country and source. Use the refresh icon above to check again.")
+                        } else {
+                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                channels.take(6).forEachIndexed { index, channel -> ChannelRow(channel, index + 1) }
+                                if (channels.size > 6) androidx.compose.material3.TextButton(onClick = { selectedTab = 1 }) {
+                                    Text("See all ${channels.size} channels", color = Color(0xFFFF8B93))
+                                }
+                            }
+                        }
+                        data?.previousFixture?.let {
+                            SectionHeader("LAST LEAGUE MATCH", data.previousKickoff.orEmpty())
+                            InfoPanel(it, "Previous Premier League fixture")
+                        }
+                    }
+                    1 -> {
+                        SectionHeader("WORLDWIDE TV CHANNELS", "Broadcaster names collected from guide pages and web searches")
+                        if (channels.isEmpty()) {
+                            InfoPanel(if (loading) "Searching listings…" else "No broadcaster names found",
+                                "Try refreshing later. A listing is not a guarantee that a channel will show the match in your region.")
+                        } else channels.forEachIndexed { index, channel -> ChannelRow(channel, index + 1) }
+                        SectionHeader("GUIDE SOURCES", "Open a source to check its own listing")
+                        if (data?.guides.isNullOrEmpty()) InfoPanel("Guide pages unavailable", "The app will retry automatically.")
+                        else data!!.guides.forEach { guide ->
+                            Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = Panel)) {
+                                Row(Modifier.fillMaxWidth().padding(14.dp), verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                    Box(Modifier.background(Color(0xFF302126), RoundedCornerShape(10.dp)).padding(10.dp)) {
+                                        Icon(Icons.Filled.Public, contentDescription = null, tint = Color(0xFFFF8B93))
+                                    }
+                                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                        Text(guide.name, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                        Text(guide.channels.takeIf { it.isNotEmpty() }?.joinToString(" · ") ?: "No channel name extracted",
+                                            color = Muted, fontSize = 11.sp, maxLines = 2)
+                                    }
+                                    androidx.compose.material3.IconButton(onClick = {
+                                        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(guide.url)))
+                                    }) { Icon(Icons.Filled.OpenInNew, contentDescription = "Open ${guide.name}", tint = CatRed) }
+                                }
+                            }
+                        }
+                        Text("Channel names are extracted from public page text and search snippets. They may be incomplete, region-specific or unconfirmed.",
+                            color = Muted, fontSize = 11.sp, lineHeight = 16.sp)
+                    }
+                    2 -> {
+                        SectionHeader("TEAM & LINE-UPS", "Confirmed match-day line-ups when published")
+                        if (data?.lineups.isNullOrEmpty()) {
+                            InfoPanel("Line-ups not available yet",
+                                "Starting XIs are usually published closer to kick-off. The registered squad below is not a confirmed match-day team.")
+                            if (!data?.squadPlayers.isNullOrEmpty()) {
+                                SectionHeader("REGISTERED PREMIER LEAGUE SQUAD", "Squad numbers · 2026/27")
+                                Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(18.dp), colors = CardDefaults.cardColors(containerColor = Panel)) {
+                                    Text(data!!.squadPlayers.joinToString("\n"), Modifier.fillMaxWidth().padding(16.dp), color = Color.White, fontSize = 14.sp, lineHeight = 23.sp)
+                                }
+                            }
+                        } else data!!.lineups.forEach { team ->
+                            Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(containerColor = Panel)) {
+                                Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                                    Text(team.name.uppercase(), color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Black)
+                                    team.formation?.let { Text("Formation  $it", color = Muted, fontSize = 12.sp) }
+                                    Text("STARTING XI", color = CatRed, fontWeight = FontWeight.ExtraBold, fontSize = 11.sp, letterSpacing = 1.5.sp)
+                                    team.starters.forEachIndexed { index, player ->
+                                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                                            Text((index + 1).toString().padStart(2, '0'), color = CatRed, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                            Text(player, color = Color.White, fontSize = 13.sp)
+                                        }
+                                    }
+                                    if (team.substitutes.isNotEmpty()) {
+                                        androidx.compose.material3.HorizontalDivider(color = Color(0xFF34363C))
+                                        Text("SUBSTITUTES", color = Muted, fontWeight = FontWeight.Bold, fontSize = 11.sp, letterSpacing = 1.4.sp)
+                                        Text(team.substitutes.joinToString("\n"), color = Muted, fontSize = 13.sp, lineHeight = 21.sp)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    3 -> {
+                        SectionHeader("RECENT RESULTS", "Latest result information available from public sources")
+                        data?.previousFixture?.let { previous ->
+                            Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(containerColor = Panel)) {
+                                Column(Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    Text("PREVIOUS LEAGUE MATCH", color = CatRed, fontSize = 11.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 1.4.sp)
+                                    Text(previous, color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                                    Text(data.previousKickoff ?: "Date unavailable", color = Muted, fontSize = 12.sp)
+                                }
+                            }
+                        }
+                        data?.previousCupFixture?.let { previous ->
+                            Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(containerColor = Panel)) {
+                                Column(Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    Text("PREVIOUS CUP / EUROPE MATCH", color = CatRed, fontSize = 11.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 1.4.sp)
+                                    Text(previous, color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                                    Text(data.previousCupKickoff ?: "Date unavailable", color = Muted, fontSize = 12.sp)
+                                }
+                            }
+                        }
+                        if (data?.previousFixture.isNullOrBlank() && data?.previousCupFixture.isNullOrBlank())
+                            InfoPanel("No recent results found", "The app will retry when it refreshes its public sources.")
+                    }
+                    else -> {
+                        SectionHeader("SEARCH LISTINGS", "Filter the results currently loaded in the app")
+                        androidx.compose.material3.OutlinedTextField(
+                            value = searchQuery, onValueChange = { searchQuery = it }, modifier = Modifier.fillMaxWidth(),
+                            singleLine = true, leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null, tint = Muted) },
+                            placeholder = { Text("Channel or guide name", color = Muted) }, shape = RoundedCornerShape(16.dp),
+                            colors = androidx.compose.material3.OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = CatRed, unfocusedBorderColor = Color(0xFF3A3D45),
+                                focusedTextColor = Color.White, unfocusedTextColor = Color.White, cursorColor = CatRed
+                            )
+                        )
+                        SectionHeader("MATCHING CHANNELS", "${filteredChannels.size} result${if (filteredChannels.size == 1) "" else "s"}")
+                        if (filteredChannels.isEmpty()) InfoPanel("No matching channels", "Try a different term or clear the search. This filters loaded results; it does not search the whole internet.")
+                        else filteredChannels.forEachIndexed { index, channel -> ChannelRow(channel, index + 1) }
+                        SectionHeader("MATCHING SOURCES", "${filteredGuides.size + filteredSearchResults.size} results")
+                        filteredGuides.forEach { guide ->
+                            Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp), colors = CardDefaults.cardColors(containerColor = Panel)) {
+                                Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                                    Text(guide.name, color = Color.White, fontWeight = FontWeight.Bold)
+                                    Text(guide.context ?: "Sunderland fixture listing", color = Muted, fontSize = 12.sp, lineHeight = 17.sp, maxLines = 4)
+                                    androidx.compose.material3.TextButton(onClick = { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(guide.url))) }) {
+                                        Text("Open source  ↗", color = Color(0xFFFF8B93))
+                                    }
+                                }
+                            }
+                        }
+                        filteredSearchResults.forEach { result ->
+                            Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp), colors = CardDefaults.cardColors(containerColor = Panel)) {
+                                Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                                    Text(result.title, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                    Text(result.snippet, color = Muted, fontSize = 12.sp, lineHeight = 17.sp)
+                                    Text("Source: ${result.source}", color = CatRed, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                }
+                            }
+                        }
+                    }
+                }
+
+                Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(18.dp), colors = CardDefaults.cardColors(containerColor = Color(0xFF17191D))) {
+                    Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Icon(Icons.Filled.Refresh, contentDescription = null, tint = CatRed, modifier = Modifier.size(17.dp))
+                            Text("BLACK CAT GLOBAL", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                            Spacer(Modifier.weight(1f))
+                            Text("v${BuildConfig.VERSION_NAME}", color = Muted, fontSize = 10.sp)
+                        }
+                        Text("Listings refresh every 60 seconds. Broadcaster results may be incomplete or unconfirmed. This app does not host or stream matches.",
+                            color = Muted, fontSize = 11.sp, lineHeight = 16.sp)
+                        Button(
+                            onClick = {
+                                if (!checkingUpdate) {
+                                    checkingUpdate = true
+                                    updateMessage = null
+                                    scope.launch {
+                                        val result = withContext(Dispatchers.IO) { checkForGitHubUpdate() }
+                                        checkingUpdate = false
+                                        updateInfo = result
+                                        updateMessage = when {
+                                            result == null -> "Couldn't check for updates. Check your internet connection and try again."
+                                            result.versionCode > BuildConfig.VERSION_CODE -> null
+                                            else -> "You're using the latest version."
+                                        }
+                                        FirebaseAnalytics.getInstance(context).logEvent("update_check", Bundle().apply {
+                                            putBoolean("update_available", result != null && result.versionCode > BuildConfig.VERSION_CODE)
+                                        })
+                                    }
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth(), enabled = !checkingUpdate,
+                            colors = ButtonDefaults.buttonColors(containerColor = CatRed, contentColor = Color.White),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            if (checkingUpdate) {
+                                CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp, color = Color.White)
+                                Spacer(Modifier.width(8.dp))
+                            }
+                            Text(if (checkingUpdate) "Checking for updates…" else "Check for updates", fontWeight = FontWeight.Bold)
+                        }
+                        updateMessage?.let { Text(it, color = Muted, fontSize = 12.sp) }
+                    }
+                }
             }
-            Spacer(Modifier.height(12.dp))
-            Text("Listings refresh automatically", color = Muted, fontSize = 12.sp)
-            Spacer(Modifier.height(10.dp))
-            Text(
-                "Black Cat Global provides information about TV channels and broadcasters showing Sunderland matches. It does not stream, host or provide the matches themselves. Listings are for information only and may not always be accurate or available in every region.",
-                color = Muted,
-                fontSize = 11.sp,
-                lineHeight = 16.sp,
-                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp)
-            )
+        }
+    }
+
+    if (updateInfo != null && updateInfo!!.versionCode > BuildConfig.VERSION_CODE) {
+        AlertDialog(
+            onDismissRequest = { updateInfo = null },
+            title = { Text("Update available") },
+            text = { Text("Black Cat Global ${updateInfo!!.tag} is available. Your current version is ${BuildConfig.VERSION_NAME}. Open the APK download page to install the update.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    val url = updateInfo!!.downloadUrl
+                    updateInfo = null
+                    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+                }) { Text("Download update") }
+            },
+            dismissButton = { TextButton(onClick = { updateInfo = null }) { Text("Not now") } }
+        )
+    }
+}
+
+@Composable
+private fun SectionHeader(title: String, subtitle: String? = null) {
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text(title, color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 0.8.sp)
+        if (!subtitle.isNullOrBlank()) Text(subtitle, color = Muted, fontSize = 11.sp, lineHeight = 15.sp)
+    }
+}
+
+@Composable
+private fun InfoPanel(title: String, body: String) {
+    Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = Panel)) {
+        Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text(title, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+            Text(body, color = Muted, fontSize = 12.sp, lineHeight = 18.sp)
+        }
+    }
+}
+
+@Composable
+private fun ChannelRow(channel: String, number: Int) {
+    Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp), colors = CardDefaults.cardColors(containerColor = Panel)) {
+        Row(Modifier.fillMaxWidth().padding(horizontal = 13.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Box(Modifier.background(Color(0xFF352027), RoundedCornerShape(9.dp)).padding(horizontal = 9.dp, vertical = 7.dp)) {
+                Text(number.toString().padStart(2, '0'), color = Color(0xFFFF8B93), fontSize = 11.sp, fontWeight = FontWeight.ExtraBold)
+            }
+            Text(channel, Modifier.weight(1f), color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+            Text("FOUND", color = Muted, fontSize = 9.sp, letterSpacing = 0.8.sp)
         }
     }
 }
