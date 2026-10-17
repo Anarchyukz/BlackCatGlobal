@@ -108,9 +108,9 @@ private data class DashboardData(
 private val broadcasterTerms = listOf(
     "Sky Sports", "TNT Sports", "HBO Max", "DAZN", "ESPN", "beIN SPORTS", "beIN Sports",
     "Stan Sport", "SuperSport", "Disney+", "Peacock", "NBC", "USA Network", "Canal+",
-    "Setanta Sports", "Paramount+", "JioHotstar", "Star Sports", "Viaplay", "Amazon Prime",
-    "Prime Video", "Fubo", "Sport TV", "Ziggo Sport", "Eleven Sports",
-    "Movistar", "Arena Sport", "DStv", "TOD", "LFCTV", "NOW", "NOW TV", "HBO MAX", "Sky Sports+"
+    "Setanta Sports", "Paramount+", "JioHotstar", "Star Sports", "Viaplay",
+    "Sport TV", "Ziggo Sport", "Eleven Sports",
+    "Movistar", "Arena Sport", "DStv", "TOD", "LFCTV", "HBO MAX", "Sky Sports+"
 )
 
 private val guidePages = listOf(
@@ -173,10 +173,18 @@ private fun BlackCatApp() {
     }
 
     val data = dashboard
-    val channels = remember(data) {
+    val freshChannels = remember(data) {
         (data?.guides.orEmpty().flatMap { it.channels } + data?.searchResults.orEmpty().flatMap { it.channels })
-            .map { canonicalChannelName(it.trim()) }.filter { it.isNotBlank() }
+            .map { canonicalChannelName(it.trim()) }
+            .filter { it.isNotBlank() && !isStreamingPlatformNotChannel(it) }
             .distinctBy { it.lowercase() }.sortedBy { it.lowercase() }
+    }
+    // Keep the last non-empty set visible while a refresh runs or if a guide temporarily
+    // returns no results. Replace it only when a later refresh finds broadcaster results.
+    var lastKnownChannels by remember { mutableStateOf<List<String>>(emptyList()) }
+    val channels = if (freshChannels.isNotEmpty()) freshChannels else lastKnownChannels
+    LaunchedEffect(freshChannels) {
+        if (freshChannels.isNotEmpty()) lastKnownChannels = freshChannels
     }
     val filteredChannels = remember(channels, searchQuery) {
         channels.filter { it.contains(searchQuery.trim(), ignoreCase = true) }
@@ -1120,11 +1128,18 @@ private fun checkForGitHubUpdate(): GitHubUpdate? {
     }
 }
 
+private fun isStreamingPlatformNotChannel(raw: String): Boolean {
+    // These are apps/services, not the TV channel carrying a match.
+    // Keep named sports channels such as Sky Sports Football and Sky Sports+.
+    return raw.trim().lowercase() in setOf(
+        "amazon prime", "amazon prime video", "prime video", "prime tv",
+        "apple tv", "fubo", "now", "now tv", "disney+"
+    )
+}
+
 private fun canonicalChannelName(raw: String): String {
     // Merge spelling/branding aliases across guide sites and search engines.
     return when (raw.trim().lowercase()) {
-        "amazon prime", "prime video" -> "Prime Video"
-        "now tv", "now" -> "NOW"
         "hbo max" -> "HBO Max"
         "bein sports" -> "beIN SPORTS"
         else -> raw.trim()
