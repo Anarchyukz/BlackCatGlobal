@@ -3,6 +3,7 @@ package com.anarchyukz.blackcatglobal
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import com.google.firebase.analytics.FirebaseAnalytics
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -108,6 +109,9 @@ private val guidePages = listOf(
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        FirebaseAnalytics.getInstance(this).logEvent("dashboard_open", Bundle().apply {
+            putString("screen_name", "main_dashboard")
+        })
         setContent {
             MaterialTheme(colorScheme = darkColorScheme(
                 primary = CatRed,
@@ -144,6 +148,20 @@ private fun BlackCatApp() {
             .map { canonicalChannelName(it.trim()) }
             .filter { it.isNotBlank() }
             .distinctBy { it.lowercase() }
+    }
+    var analyticsSnapshotLogged by remember { mutableStateOf(false) }
+
+    LaunchedEffect(data) {
+        if (data != null && !analyticsSnapshotLogged) {
+            analyticsSnapshotLogged = true
+            FirebaseAnalytics.getInstance(context).logEvent("dashboard_data_loaded", Bundle().apply {
+                putBoolean("fixture_available", !data.fixture.isNullOrBlank())
+                putInt("broadcaster_count", channels.size)
+                putBoolean("lineups_available", data.lineups.isNotEmpty())
+                putBoolean("squad_available", data.squadPlayers.isNotEmpty())
+                putBoolean("previous_result_available", !data.previousFixture.isNullOrBlank())
+            })
+        }
     }
 
     Surface(modifier = Modifier.fillMaxSize(), color = DeepBackground) {
