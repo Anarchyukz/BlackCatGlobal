@@ -28,6 +28,7 @@ import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.OpenInNew
+import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.SportsSoccer
 import androidx.compose.material3.Button
@@ -212,7 +213,7 @@ private fun BlackCatApp() {
                         Triple("Search", Icons.Filled.Search, 4)
                     )
                     items.forEach { item ->
-                        androidx.compose.material3.NavigationBarItem(
+                        NavigationBarItem(
                             selected = selectedTab == item.third,
                             onClick = { selectedTab = item.third },
                             icon = { Icon(item.second, contentDescription = item.first) },
