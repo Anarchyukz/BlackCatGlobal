@@ -1142,20 +1142,62 @@ private fun curatedBroadcastResults(fixture: String): List<WebResult> {
     val hasBournemouth = fixture.contains("Bournemouth", ignoreCase = true)
     if (!hasSunderland || !hasBournemouth) return emptyList()
 
-    val matchLabel = "Sunderland v Bournemouth"
+    val matchLabel = "Bournemouth v Sunderland"
+    // Match-specific channel names from international fixture listings. Streaming apps are
+    // retained where no separate linear channel was specified; availability must be checked locally.
     val broadcasts = listOf(
-        "United Kingdom & Ireland" to listOf("Sky Sports+", "NOW"),
-        "United States" to listOf("Peacock", "NBCSN", "fuboTV"),
-        "Canada" to listOf("DAZN Canada", "fuboTV Canada"),
-        "Caribbean & South America" to listOf("Disney+ Premium Caribbean"),
-        "Scandinavia / Nordic" to listOf("V Sport channels", "Viaplay"),
-        "Greece" to listOf("Nova Sports Start")
+        "United Kingdom" to listOf("Sky Sports+"),
+        "Ireland" to listOf("Sky Sports+"),
+        "United States" to listOf("NBCSN", "Peacock"),
+        "Canada" to listOf("DAZN Canada", "FuboTV Canada"),
+        "Caribbean" to listOf("Disney+ Premium Caribbean"),
+        "Argentina" to listOf("Disney+ Premium Argentina"),
+        "Brazil" to listOf("Disney+ Premium Brazil"),
+        "Chile" to listOf("Disney+ Premium Chile"),
+        "Colombia / Venezuela" to listOf("Disney+ Premium Sur"),
+        "Bulgaria" to listOf("Nova Sport Bulgaria"),
+        "Bosnia and Herzegovina" to listOf("Arena Sport 5"),
+        "Czech Republic" to listOf("Canal+ Sport 5", "OnePlay"),
+        "Slovakia" to listOf("Canal+ Sport 5", "Voyo"),
+        "France" to listOf("Canal+ Live 2", "myCANAL"),
+        "Spain" to listOf("DAZN Spain"),
+        "Portugal" to listOf("DAZN Portugal"),
+        "Netherlands" to listOf("Viaplay Netherlands"),
+        "Denmark" to listOf("Viaplay Denmark"),
+        "Norway" to listOf("Viaplay Norway"),
+        "Sweden" to listOf("V Sport 1", "Viaplay Sweden"),
+        "Finland" to listOf("Elisa Viihde Viaplay"),
+        "Iceland" to listOf("SÝN Sport 5"),
+        "Poland" to listOf("Canal+ Extra 5", "CANAL+ online"),
+        "Hungary" to listOf("Match4"),
+        "Germany / Austria" to listOf("Sky Sport HD 9", "Sky Go", "WOW"),
+        "Greece" to listOf("Nova Sports Start"),
+        "Estonia" to listOf("Go3 Extra Sports Estonia"),
+        "Latvia" to listOf("Go3 Extra Sports Latvia"),
+        "Lithuania" to listOf("Go3 Extra Sports Lithuania"),
+        "Ukraine" to listOf("Setanta Sports+"),
+        "South Africa" to listOf("MáXimo 360", "DStv App"),
+        "India" to listOf("JioHotstar"),
+        "Bangladesh / Pakistan" to listOf("Toffee Live", "myco"),
+        "Indonesia" to listOf("Vidio"),
+        "Japan" to listOf("U-NEXT"),
+        "South Korea" to listOf("Coupang Play"),
+        "Hong Kong / Macau" to listOf("M Plus Live"),
+        "Malaysia" to listOf("Astro Premier League 3", "Astro Go"),
+        "Singapore" to listOf("Hub Premier 3", "StarHub TV+"),
+        "Thailand / Cambodia / Laos" to listOf("MONOMAX"),
+        "Vietnam" to listOf("FPT Play"),
+        "China" to listOf("Migu"),
+        "Australia" to listOf("Stan Sport"),
+        "Turkey" to listOf("beIN CONNECT Turkey", "TOD"),
+        "Middle East / North Africa" to listOf("beIN SPORTS CONNECT", "TOD"),
+        "Worldwide / regional listings" to listOf("V Sport Premier League 3", "Canal+ Sport 5")
     )
     return broadcasts.map { (region, platforms) ->
         WebResult(
-            title = "$matchLabel — broadcast options",
-            snippet = "Listed platforms: ${platforms.joinToString(", ")}. Match-specific data supplied to the app; confirm local availability and rights before kick-off.",
-            source = "Structured broadcast data (unverified)",
+            title = "$matchLabel — $region",
+            snippet = "Listed channel(s) / service(s): ${platforms.joinToString(", ")}. These are match-specific listing leads, not a guarantee of carriage in every package; check the broadcaster's local schedule.",
+            source = "International match TV listings (unverified)",
             region = region,
             channels = platforms
         )
