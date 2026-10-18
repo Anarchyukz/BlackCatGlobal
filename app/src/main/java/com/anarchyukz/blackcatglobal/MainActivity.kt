@@ -175,11 +175,6 @@ private fun BlackCatApp() {
     var checkingUpdate by remember { mutableStateOf(false) }
     var updateMessage by remember { mutableStateOf<String?>(null) }
     var updateInfo by remember { mutableStateOf<GitHubUpdate?>(null) }
-    var sponsorDialogOpen by remember { mutableStateOf(false) }
-    var sponsorName by remember { mutableStateOf("") }
-    var sponsorEmail by remember { mutableStateOf("") }
-    var sponsorMessage by remember { mutableStateOf("") }
-    var sponsorSubmitting by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
     LaunchedEffect(refreshToken) {
@@ -341,7 +336,16 @@ private fun BlackCatApp() {
                         }
 
                         Card(
-                            modifier = Modifier.fillMaxWidth().clickable { sponsorDialogOpen = true },
+                            modifier = Modifier.fillMaxWidth().clickable {
+                                val emailIntent = Intent(Intent.ACTION_SENDTO, Uri.parse("mailto:blackcatglobal@proton.me")).apply {
+                                    putExtra(Intent.EXTRA_SUBJECT, "Black Cat Global sponsorship enquiry")
+                                }
+                                try {
+                                    context.startActivity(emailIntent)
+                                } catch (_: android.content.ActivityNotFoundException) {
+                                    android.widget.Toast.makeText(context, "No email app is installed.", android.widget.Toast.LENGTH_LONG).show()
+                                }
+                            },
                             shape = RoundedCornerShape(18.dp),
                             colors = CardDefaults.cardColors(containerColor = Color(0xFF252027))
                         ) {
@@ -548,65 +552,6 @@ private fun BlackCatApp() {
                 }
             }
         }
-    }
-
-    if (sponsorDialogOpen) {
-        AlertDialog(
-            onDismissRequest = { sponsorDialogOpen = false },
-            title = { Text("Sponsor Black Cat Global") },
-            text = {
-                Column(
-                    modifier = Modifier.fillMaxWidth().heightIn(max = 440.dp).verticalScroll(rememberScrollState()),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    Text("Interested in supporting the app? Tell us a little about yourself and how you would like to work together.",
-                        color = Muted, fontSize = 13.sp, lineHeight = 18.sp)
-                    OutlinedTextField(value = sponsorName, onValueChange = { sponsorName = it },
-                        modifier = Modifier.fillMaxWidth(), singleLine = true, label = { Text("Your name or business") })
-                    OutlinedTextField(value = sponsorEmail, onValueChange = { sponsorEmail = it },
-                        modifier = Modifier.fillMaxWidth(), singleLine = true, label = { Text("Your email address") })
-                    OutlinedTextField(value = sponsorMessage, onValueChange = { sponsorMessage = it },
-                        modifier = Modifier.fillMaxWidth(), minLines = 3, maxLines = 5,
-                        label = { Text("How would you like to sponsor?") })
-                    Text("Send your enquiry directly from the app. You do not need to open an email app.",
-                        color = Muted, fontSize = 11.sp, lineHeight = 15.sp)
-                }
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        if (!sponsorSubmitting) {
-                            sponsorSubmitting = true
-                            scope.launch {
-                                val error = withContext(Dispatchers.IO) {
-                                    submitSponsorEnquiry(sponsorName.trim(), sponsorEmail.trim(), sponsorMessage.trim())
-                                }
-                                sponsorSubmitting = false
-                                if (error == null) {
-                                    sponsorDialogOpen = false
-                                    sponsorName = ""
-                                    sponsorEmail = ""
-                                    sponsorMessage = ""
-                                    android.widget.Toast.makeText(context, "Sponsorship enquiry submitted.", android.widget.Toast.LENGTH_LONG).show()
-                                } else {
-                                    android.widget.Toast.makeText(context, error, android.widget.Toast.LENGTH_LONG).show()
-                                }
-                            }
-                        }
-                    },
-                    enabled = !sponsorSubmitting && sponsorName.isNotBlank() &&
-                        sponsorEmail.contains("@") && sponsorMessage.isNotBlank(),
-                    colors = ButtonDefaults.buttonColors(containerColor = CatRed, contentColor = Color.White)
-                ) {
-                    if (sponsorSubmitting) {
-                        CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp, color = Color.White)
-                        Spacer(Modifier.width(8.dp))
-                    }
-                    Text(if (sponsorSubmitting) "Sending…" else "Send enquiry")
-                }
-            },
-            dismissButton = { TextButton(onClick = { sponsorDialogOpen = false }) { Text("Cancel") } }
-        )
     }
 
     if (updateInfo != null && updateInfo!!.versionCode > BuildConfig.VERSION_CODE) {
@@ -1398,45 +1343,6 @@ private fun parseKickoffMillis(label: String): Long? {
         } catch (_: Exception) { }
     }
     return null
-}
-
-private fun submitSponsorEnquiry(name: String, email: String, message: String): String? {
-    var connection: HttpURLConnection? = null
-    return try {
-        connection = (URL("https://formsubmit.co/ajax/gregz2204@gmail.com").openConnection() as HttpURLConnection).apply {
-            requestMethod = "POST"
-            connectTimeout = 15000
-            readTimeout = 15000
-            doOutput = true
-            setRequestProperty("Content-Type", "application/json; charset=UTF-8")
-            setRequestProperty("Accept", "application/json")
-            setRequestProperty("User-Agent", "BlackCatGlobal-Android")
-        }
-        val payload = org.json.JSONObject()
-            .put("name", name)
-            .put("email", email)
-            .put("message", message)
-            .put("_subject", "Black Cat Global sponsorship enquiry")
-            .put("_template", "table")
-        connection.outputStream.bufferedWriter(Charsets.UTF_8).use { it.write(payload.toString()) }
-        val status = connection.responseCode
-        val stream = if (status in 200..299) connection.inputStream else connection.errorStream
-        val responseText = stream?.bufferedReader(Charsets.UTF_8)?.use { it.readText() }.orEmpty()
-        if (status !in 200..299) {
-            "The enquiry could not be submitted (HTTP $status). Please try again."
-        } else {
-            val response = org.json.JSONObject(responseText)
-            if (response.optString("success").equals("true", ignoreCase = true) || response.optBoolean("success")) {
-                null
-            } else {
-                response.optString("message").ifBlank { "The enquiry was not accepted. Please try again later." }
-            }
-        }
-    } catch (_: Exception) {
-        "Couldn't submit the enquiry. Check your internet connection and try again."
-    } finally {
-        connection?.disconnect()
-    }
 }
 
 private fun enc(value: String): String =
