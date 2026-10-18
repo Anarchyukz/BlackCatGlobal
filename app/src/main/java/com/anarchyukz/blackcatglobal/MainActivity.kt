@@ -578,7 +578,7 @@ private fun BlackCatApp() {
 @Composable
 private fun FixtureMatchup(fixture: String) {
     val parts = remember(fixture) {
-        Regex("(?i)\\\\s+(?:v\\\\.?|vs\\\\.?|versus)\\\\s+")
+        Regex("(?i)\\s+(?:v\\.?|vs\\.?|versus)\\s+")
             .split(fixture.trim())
             .map { it.trim() }
             .filter { it.isNotBlank() }
