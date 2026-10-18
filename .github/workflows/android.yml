@@ -46,6 +46,49 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
+
+      - name: Configure release signing
+        id: release_signing
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          if [ -z "$ANDROID_KEYSTORE_BASE64" ] || [ -z "$ANDROID_KEYSTORE_PASSWORD" ] || [ -z "$ANDROID_KEY_ALIAS" ] || [ -z "$ANDROID_KEY_PASSWORD" ]; then
+            echo "Signing secrets are not configured; skipping the signed release APK."
+            echo "SIGNING_CONFIGURED=false" >> "$GITHUB_ENV"
+            exit 0
+          fi
+          KEYSTORE_PATH="$RUNNER_TEMP/blackcatglobal-release.jks"
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$KEYSTORE_PATH"
+          echo "ANDROID_KEYSTORE_PATH=$KEYSTORE_PATH" >> "$GITHUB_ENV"
+          echo "ANDROID_KEYSTORE_PASSWORD=$ANDROID_KEYSTORE_PASSWORD" >> "$GITHUB_ENV"
+          echo "ANDROID_KEY_ALIAS=$ANDROID_KEY_ALIAS" >> "$GITHUB_ENV"
+          echo "ANDROID_KEY_PASSWORD=$ANDROID_KEY_PASSWORD" >> "$GITHUB_ENV"
+          echo "SIGNING_CONFIGURED=true" >> "$GITHUB_ENV"
+
+      - name: Build signed release APK
+        if: env.SIGNING_CONFIGURED == 'true'
+        run: gradle --no-daemon assembleRelease
+
+      - name: Upload signed APK artifact
+        if: env.SIGNING_CONFIGURED == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: BlackCatGlobal-signed-release-apk
+          path: app/build/outputs/apk/release/app-release.apk
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Publish signed APK to GitHub Releases
+        if: env.SIGNING_CONFIGURED == 'true'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v1.2.${{ github.run_number }}
+          files: app/build/outputs/apk/release/app-release.apk
+          fail_on_unmatched_files: true
+
       - name: Publish APK to GitHub Releases
         uses: softprops/action-gh-release@v2
         with:
