@@ -185,7 +185,7 @@ private fun BlackCatApp() {
         dashboard = withContext(Dispatchers.IO) { loadDashboard(context) }
         loading = false
         while (true) {
-            kotlinx.coroutines.delay(60_000L)
+            kotlinx.coroutines.delay(5 * 60_000L)
             loading = true
             dashboard = withContext(Dispatchers.IO) { loadDashboard(context) }
             loading = false
@@ -325,7 +325,7 @@ private fun BlackCatApp() {
                             Box(Modifier.size(8.dp).background(CatRed, RoundedCornerShape(50)))
                             Text(if (loading) "UPDATING MATCH CENTRE" else "MATCH CENTRE", color = CatRed, fontWeight = FontWeight.ExtraBold, fontSize = 11.sp, letterSpacing = 1.8.sp)
                             Spacer(Modifier.weight(1f))
-                            Text("AUTO REFRESH · 60 SEC", color = Muted, fontSize = 9.sp)
+                            Text("AUTO REFRESH · 5 MIN", color = Muted, fontSize = 9.sp)
                         }
                         Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(24.dp),
                             colors = CardDefaults.cardColors(containerColor = Panel),
