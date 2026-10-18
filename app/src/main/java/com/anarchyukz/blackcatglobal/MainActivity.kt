@@ -61,6 +61,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.Dispatchers
@@ -627,15 +628,33 @@ private fun FixtureMatchup(fixture: String) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
-            TeamCrest(badgeUrls.getOrNull(0), parts[0], Modifier.size(52.dp))
-            Text(parts[0], modifier = Modifier.weight(1f), color = Color.White, fontSize = 20.sp,
-                lineHeight = 24.sp, fontWeight = FontWeight.Black, maxLines = 2)
-            Text("VS", color = Color(0xFFFFA2A8), fontSize = 11.sp, fontWeight = FontWeight.ExtraBold)
-            Text(parts[1], modifier = Modifier.weight(1f), color = Color.White, fontSize = 20.sp,
-                lineHeight = 24.sp, fontWeight = FontWeight.Black, maxLines = 2)
-            TeamCrest(badgeUrls.getOrNull(1), parts[1], Modifier.size(52.dp))
+            TeamCrest(badgeUrls.getOrNull(0), parts[0], Modifier.size(40.dp))
+            Text(
+                parts[0],
+                modifier = Modifier.weight(1f),
+                color = Color.White,
+                fontSize = 14.sp,
+                lineHeight = 17.sp,
+                fontWeight = FontWeight.Black,
+                maxLines = 1,
+                softWrap = false,
+                overflow = TextOverflow.Ellipsis
+            )
+            Text("VS", color = Color(0xFFFFA2A8), fontSize = 10.sp, fontWeight = FontWeight.ExtraBold, maxLines = 1)
+            Text(
+                parts[1],
+                modifier = Modifier.weight(1f),
+                color = Color.White,
+                fontSize = 14.sp,
+                lineHeight = 17.sp,
+                fontWeight = FontWeight.Black,
+                maxLines = 1,
+                softWrap = false,
+                overflow = TextOverflow.Ellipsis
+            )
+            TeamCrest(badgeUrls.getOrNull(1), parts[1], Modifier.size(40.dp))
         }
     } else {
         Text(fixture, color = Color.White, fontSize = 27.sp, lineHeight = 32.sp, fontWeight = FontWeight.Black)
