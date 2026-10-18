@@ -6,6 +6,8 @@ import android.net.Uri
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import com.google.firebase.analytics.FirebaseAnalytics
+import coil.compose.AsyncImage
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -299,8 +301,9 @@ private fun BlackCatApp() {
                                 verticalArrangement = Arrangement.spacedBy(12.dp)
                             ) {
                                 Text("NEXT FIXTURE", color = Color(0xFFFFA2A8), fontSize = 11.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 2.sp)
-                                Text(data?.fixture ?: if (loading) "Finding Sunderland's next match…" else "Fixture unavailable",
-                                    color = Color.White, fontSize = 27.sp, lineHeight = 32.sp, fontWeight = FontWeight.Black)
+                                FixtureMatchup(
+                                    fixture = data?.fixture ?: if (loading) "Finding Sunderland's next match…" else "Fixture unavailable"
+                                )
                                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                     Icon(Icons.Filled.SportsSoccer, contentDescription = null, tint = CatRed, modifier = Modifier.size(19.dp))
                                     Text(data?.kickoff ?: "Kick-off time will appear when confirmed", color = Muted, fontSize = 13.sp)
@@ -568,6 +571,94 @@ private fun BlackCatApp() {
             },
             dismissButton = { TextButton(onClick = { updateInfo = null }) { Text("Not now") } }
         )
+    }
+}
+
+
+@Composable
+private fun FixtureMatchup(fixture: String) {
+    val parts = remember(fixture) {
+        Regex("(?i)\\\\s+(?:v\\\\.?|vs\\\\.?|versus)\\\\s+")
+            .split(fixture.trim())
+            .map { it.trim() }
+            .filter { it.isNotBlank() }
+            .take(2)
+    }
+    var badgeUrls by remember(fixture) { mutableStateOf<List<String?>>(emptyList()) }
+
+    LaunchedEffect(parts) {
+        badgeUrls = if (parts.size == 2) {
+            withContext(Dispatchers.IO) {
+                parts.map { team ->
+                    try {
+                        val query = enc(team.removeSuffix(" AFC").removeSuffix(" FC").trim())
+                        val doc = Jsoup.connect("https://www.thesportsdb.com/api/v1/json/123/searchteams.php?t=$query")
+                            .userAgent("BlackCatGlobal-Android")
+                            .timeout(7000)
+                            .ignoreContentType(true)
+                            .get()
+                        val teams = doc.select("body").text().let { org.json.JSONObject(it).optJSONArray("teams") }
+                        var badge: String? = null
+                        if (teams != null) {
+                            for (i in 0 until teams.length()) {
+                                val item = teams.optJSONObject(i) ?: continue
+                                val name = item.optString("strTeam")
+                                val candidate = item.optString("strBadge").ifBlank { item.optString("strTeamBadge") }
+                                if (candidate.startsWith("https://") &&
+                                    (name.equals(team, true) || name.contains(team, true) || team.contains(name, true))) {
+                                    badge = candidate
+                                    break
+                                }
+                            }
+                            if (badge == null && teams.length() > 0) {
+                                val first = teams.optJSONObject(0)
+                                val candidate = first?.optString("strBadge").orEmpty().ifBlank { first?.optString("strTeamBadge").orEmpty() }
+                                badge = candidate.takeIf { it.startsWith("https://") }
+                            }
+                        }
+                        badge
+                    } catch (_: Exception) { null }
+                }
+            }
+        } else emptyList()
+    }
+
+    if (parts.size == 2) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            TeamCrest(badgeUrls.getOrNull(0), parts[0], Modifier.size(52.dp))
+            Text(parts[0], modifier = Modifier.weight(1f), color = Color.White, fontSize = 20.sp,
+                lineHeight = 24.sp, fontWeight = FontWeight.Black, maxLines = 2)
+            Text("VS", color = Color(0xFFFFA2A8), fontSize = 11.sp, fontWeight = FontWeight.ExtraBold)
+            Text(parts[1], modifier = Modifier.weight(1f), color = Color.White, fontSize = 20.sp,
+                lineHeight = 24.sp, fontWeight = FontWeight.Black, maxLines = 2)
+            TeamCrest(badgeUrls.getOrNull(1), parts[1], Modifier.size(52.dp))
+        }
+    } else {
+        Text(fixture, color = Color.White, fontSize = 27.sp, lineHeight = 32.sp, fontWeight = FontWeight.Black)
+    }
+}
+
+@Composable
+private fun TeamCrest(url: String?, teamName: String, modifier: Modifier = Modifier) {
+    Box(
+        modifier = modifier.background(Color(0xFF30262B), RoundedCornerShape(12.dp)).padding(4.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        if (!url.isNullOrBlank()) {
+            AsyncImage(
+                model = url,
+                contentDescription = "$teamName crest",
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Fit
+            )
+        } else {
+            Icon(Icons.Filled.SportsSoccer, contentDescription = "$teamName crest unavailable",
+                tint = Muted, modifier = Modifier.size(24.dp))
+        }
     }
 }
 
