@@ -284,6 +284,41 @@ private fun BlackCatApp() {
                     }
                 }
 
+                if (loading) {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = CardDefaults.cardColors(containerColor = Color(0xFF282027))
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(17.dp),
+                                color = CatRed,
+                                strokeWidth = 2.dp
+                            )
+                            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                Text(
+                                    "SEARCHING MATCH LISTINGS",
+                                    color = Color(0xFFFFA2A8),
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    letterSpacing = 0.8.sp
+                                )
+                                Text(
+                                    "Checking public TV guides and worldwide sources…",
+                                    color = Muted,
+                                    fontSize = 11.sp,
+                                    maxLines = 2
+                                )
+                            }
+                        }
+                    }
+                }
+
                 when (selectedTab) {
                     0 -> {
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -628,33 +663,53 @@ private fun FixtureMatchup(fixture: String) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(6.dp)
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            TeamCrest(badgeUrls.getOrNull(0), parts[0], Modifier.size(40.dp))
-            Text(
-                parts[0],
+            Column(
                 modifier = Modifier.weight(1f),
-                color = Color.White,
-                fontSize = 14.sp,
-                lineHeight = 17.sp,
-                fontWeight = FontWeight.Black,
-                maxLines = 1,
-                softWrap = false,
-                overflow = TextOverflow.Ellipsis
-            )
-            Text("VS", color = Color(0xFFFFA2A8), fontSize = 10.sp, fontWeight = FontWeight.ExtraBold, maxLines = 1)
-            Text(
-                parts[1],
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                TeamCrest(badgeUrls.getOrNull(0), parts[0], Modifier.size(64.dp))
+                Text(
+                    parts[0],
+                    modifier = Modifier.fillMaxWidth(),
+                    color = Color.White,
+                    fontSize = 18.sp,
+                    lineHeight = 21.sp,
+                    fontWeight = FontWeight.Black,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                    maxLines = 1,
+                    softWrap = false,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+            Column(
+                modifier = Modifier.padding(horizontal = 2.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Text("VS", color = Color(0xFFFFA2A8), fontSize = 12.sp, fontWeight = FontWeight.ExtraBold, maxLines = 1)
+            }
+            Column(
                 modifier = Modifier.weight(1f),
-                color = Color.White,
-                fontSize = 14.sp,
-                lineHeight = 17.sp,
-                fontWeight = FontWeight.Black,
-                maxLines = 1,
-                softWrap = false,
-                overflow = TextOverflow.Ellipsis
-            )
-            TeamCrest(badgeUrls.getOrNull(1), parts[1], Modifier.size(40.dp))
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                TeamCrest(badgeUrls.getOrNull(1), parts[1], Modifier.size(64.dp))
+                Text(
+                    parts[1],
+                    modifier = Modifier.fillMaxWidth(),
+                    color = Color.White,
+                    fontSize = 18.sp,
+                    lineHeight = 21.sp,
+                    fontWeight = FontWeight.Black,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                    maxLines = 1,
+                    softWrap = false,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
         }
     } else {
         Text(fixture, color = Color.White, fontSize = 27.sp, lineHeight = 32.sp, fontWeight = FontWeight.Black)
