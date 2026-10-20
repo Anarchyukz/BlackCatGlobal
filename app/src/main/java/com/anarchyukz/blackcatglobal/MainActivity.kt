@@ -206,6 +206,11 @@ private fun BlackCatApp() {
         val table = withContext(Dispatchers.IO) { runCatching { loadPremierLeagueTable() }.getOrDefault(emptyList()) }
         if (table.isNotEmpty()) leagueTeams = table
         leagueLoading = false
+        while (true) {
+            kotlinx.coroutines.delay(5 * 60_000L)
+            val refreshed = withContext(Dispatchers.IO) { runCatching { loadPremierLeagueTable() }.getOrDefault(emptyList()) }
+            if (refreshed.isNotEmpty()) leagueTeams = refreshed
+        }
     }
 
     LaunchedEffect(refreshToken) {
