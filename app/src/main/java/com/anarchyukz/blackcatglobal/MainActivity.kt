@@ -5,6 +5,7 @@ import android.content.Intent
 import android.net.Uri
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.compose.BackHandler
 import com.google.firebase.analytics.FirebaseAnalytics
 import coil.compose.AsyncImage
 import androidx.compose.ui.layout.ContentScale
@@ -194,6 +195,12 @@ private fun BlackCatApp() {
     var updateMessage by remember { mutableStateOf<String?>(null) }
     var updateInfo by remember { mutableStateOf<GitHubUpdate?>(null) }
     val scope = rememberCoroutineScope()
+
+    BackHandler(enabled = readerArticle != null) {
+        readerArticle = null
+        readerContent = ""
+        readerUnavailable = false
+    }
 
     LaunchedEffect(newsRefreshToken) {
         newsLoading = true
