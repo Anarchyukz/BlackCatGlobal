@@ -349,7 +349,7 @@ private fun BlackCatApp() {
                     }
                 }
 
-                if (loading && selectedTab != 5) {
+                if (loading && selectedTab == 0) {
                     Card(
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(12.dp),
@@ -644,7 +644,7 @@ private fun BlackCatApp() {
                                 Text("Open full league table ↗", color = Color(0xFFFF8B93))
                             }
                         }
-                        SectionHeader("UPCOMING SUNDERLAND FIXTURES", "Premier League, Europe and domestic cups · UK time")
+                        SectionHeader("NEXT SUNDERLAND MATCHES", "Premier League and any European or cup fixtures · nearest kick-offs first")
                         if (fixturesLoading && upcomingFixtures.isEmpty()) {
                             InfoPanel("Loading fixtures…", "Checking Sunderland's public fixture listings.")
                         } else if (upcomingFixtures.isEmpty()) {
@@ -653,7 +653,13 @@ private fun BlackCatApp() {
                                 Text("Retry fixtures", color = Color(0xFFFF8B93))
                             }
                         } else {
-                            upcomingFixtures.forEach { fixture ->
+                            val closestKickoff = upcomingFixtures.minOfOrNull { it.sortTime }
+                            val closestMatches = if (closestKickoff == null) emptyList() else upcomingFixtures.filter {
+                                kotlin.math.abs(it.sortTime - closestKickoff) <= 48L * 60L * 60L * 1000L
+                            }
+                            val displayedFixtures = if (closestMatches.isNotEmpty()) closestMatches else upcomingFixtures.take(2)
+                            Text("Showing the next scheduled match(es) across all competitions.", color = Muted, fontSize = 11.sp)
+                            displayedFixtures.forEach { fixture ->
                                 Card(
                                     modifier = Modifier.fillMaxWidth().clickable {
                                         context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(fixture.url)))
