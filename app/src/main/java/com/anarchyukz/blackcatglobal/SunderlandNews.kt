@@ -76,7 +76,7 @@ internal fun loadPublicArticleText(url: String): String? {
         .map { it.text().replace(Regex("\\s+"), " ").trim() }
         .filter { it.length >= 35 }
         .distinct()
-    val text = paragraphs.joinToString("\\n\\n").trim()
+    val text = paragraphs.joinToString("\n\n").trim()
 
     val paywallSignals = listOf(
         "subscribe to continue", "subscribe to read", "to continue reading",
