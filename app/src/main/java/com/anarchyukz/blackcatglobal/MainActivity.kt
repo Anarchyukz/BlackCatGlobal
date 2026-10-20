@@ -177,6 +177,14 @@ private fun BlackCatApp() {
     var newsLoading by remember { mutableStateOf(true) }
     var newsArticles by remember { mutableStateOf<List<SunderlandNewsArticle>>(emptyList()) }
     var newsRefreshToken by remember { mutableIntStateOf(0) }
+    var readArticleUrls by remember {
+        mutableStateOf(context.getSharedPreferences("blackcat_news", android.content.Context.MODE_PRIVATE)
+            .getStringSet("read_urls", emptySet()).orEmpty().toSet())
+    }
+    var readerArticle by remember { mutableStateOf<SunderlandNewsArticle?>(null) }
+    var readerContent by remember { mutableStateOf("") }
+    var readerLoading by remember { mutableStateOf(false) }
+    var readerUnavailable by remember { mutableStateOf(false) }
     var leagueLoading by remember { mutableStateOf(true) }
     var leagueTeams by remember { mutableStateOf<List<LeagueTableTeam>>(emptyList()) }
     var leagueRefreshToken by remember { mutableIntStateOf(0) }
@@ -370,41 +378,94 @@ private fun BlackCatApp() {
                                 Text("News, transfer stories, match previews and reaction from around the club.", color = Muted, fontSize = 13.sp, lineHeight = 18.sp)
                             }
                         }
-                        if (newsLoading && newsArticles.isEmpty()) {
+                        if (readerArticle != null) {
+                            val article = readerArticle!!
+                            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                                TextButton(onClick = { readerArticle = null; readerContent = ""; readerUnavailable = false }) { Text("← Headlines", color = Color(0xFFFF8B93)) }
+                                Spacer(Modifier.weight(1f))
+                                Text("READER VIEW", color = Muted, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                            }
+                            Text(article.source, color = CatRed, fontSize = 11.sp, fontWeight = FontWeight.ExtraBold)
+                            Text(article.title, color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.Black, lineHeight = 30.sp)
+                            Text(article.published, color = Muted, fontSize = 11.sp)
+                            androidx.compose.material3.HorizontalDivider(color = Color(0xFF4B343A))
+                            when {
+                                readerLoading -> {
+                                    Row(Modifier.fillMaxWidth().padding(vertical = 28.dp), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
+                                        CircularProgressIndicator(color = CatRed, modifier = Modifier.size(22.dp), strokeWidth = 2.dp)
+                                        Spacer(Modifier.width(12.dp))
+                                        Text("Preparing article…", color = Muted, fontSize = 13.sp)
+                                    }
+                                }
+                                readerUnavailable -> {
+                                    InfoPanel("This story needs the publisher's page", "The full article isn't available as public readable text here. It may require a subscription or block reader access, so BlackCat Global won't try to get around that.")
+                                    Button(onClick = { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(article.url))) }, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = CatRed)) {
+                                        Icon(Icons.Filled.OpenInNew, contentDescription = null)
+                                        Spacer(Modifier.width(8.dp))
+                                        Text("Open publisher's article")
+                                    }
+                                    TextButton(onClick = { readerArticle = null; readerUnavailable = false }, modifier = Modifier.fillMaxWidth()) { Text("Back to headlines", color = Muted) }
+                                }
+                                else -> {
+                                    Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = Panel)) {
+                                        Text(readerContent, modifier = Modifier.fillMaxWidth().padding(18.dp), color = Color(0xFFE9E9ED), fontSize = 16.sp, lineHeight = 25.sp)
+                                    }
+                                    Text("Clean reader · public article text only", color = Muted, fontSize = 10.sp)
+                                    TextButton(onClick = { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(article.url))) }, modifier = Modifier.fillMaxWidth()) {
+                                        Icon(Icons.Filled.OpenInNew, contentDescription = null, modifier = Modifier.size(16.dp))
+                                        Spacer(Modifier.width(6.dp))
+                                        Text("View original article", color = Color(0xFFFF8B93))
+                                    }
+                                }
+                            }
+                        } else if (newsLoading && newsArticles.isEmpty()) {
                             InfoPanel("Loading Sunderland news…", "Fetching the latest headlines from public news sources.")
                         } else if (newsArticles.isEmpty()) {
                             InfoPanel("News is temporarily unavailable", "Check your connection and tap refresh to try again.")
                         } else {
                             newsArticles.forEach { article ->
+                                val hasRead = readArticleUrls.contains(article.url)
                                 Card(
                                     modifier = Modifier.fillMaxWidth().clickable {
-                                        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(article.url)))
+                                        readerArticle = article
+                                        readerContent = ""
+                                        readerLoading = true
+                                        readerUnavailable = false
+                                        val updatedReadUrls = readArticleUrls + article.url
+                                        readArticleUrls = updatedReadUrls
+                                        context.getSharedPreferences("blackcat_news", android.content.Context.MODE_PRIVATE).edit().putStringSet("read_urls", updatedReadUrls).apply()
+                                        scope.launch {
+                                            val extracted = withContext(Dispatchers.IO) { runCatching { loadPublicArticleText(article.url) }.getOrNull() }
+                                            if (readerArticle?.url == article.url) {
+                                                readerContent = extracted.orEmpty()
+                                                readerUnavailable = extracted.isNullOrBlank()
+                                                readerLoading = false
+                                            }
+                                        }
                                     },
                                     shape = RoundedCornerShape(18.dp),
-                                    colors = CardDefaults.cardColors(containerColor = Panel)
+                                    colors = CardDefaults.cardColors(containerColor = if (hasRead) Color(0xFF17191D) else Panel)
                                 ) {
                                     Column(Modifier.fillMaxWidth()) {
                                         article.imageUrl?.let { imageUrl ->
-                                            AsyncImage(
-                                                model = imageUrl,
-                                                contentDescription = article.title,
-                                                modifier = Modifier.fillMaxWidth().height(180.dp),
-                                                contentScale = ContentScale.Crop
-                                            )
+                                            AsyncImage(model = imageUrl, contentDescription = article.title, modifier = Modifier.fillMaxWidth().height(180.dp), contentScale = ContentScale.Crop)
                                         }
                                         Column(Modifier.fillMaxWidth().padding(15.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
-                                            Text(article.source.uppercase(), color = CatRed, fontSize = 10.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 1.1.sp)
-                                            Text(article.title, color = Color.White, fontSize = 17.sp, fontWeight = FontWeight.Bold, lineHeight = 22.sp)
-                                            Text(article.summary, color = Muted, fontSize = 12.sp, lineHeight = 17.sp, maxLines = 3, overflow = TextOverflow.Ellipsis)
+                                            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                                                Text(article.source.uppercase(), color = if (hasRead) Muted else CatRed, fontSize = 10.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 1.1.sp, modifier = Modifier.weight(1f))
+                                                Text(if (hasRead) "✓ READ" else "NEW", color = if (hasRead) Color(0xFF8D939E) else Color(0xFFFFA2A8), fontSize = 9.sp, fontWeight = FontWeight.ExtraBold)
+                                            }
+                                            Text(article.title, color = if (hasRead) Color(0xFFB8BBC3) else Color.White, fontSize = 17.sp, fontWeight = if (hasRead) FontWeight.Medium else FontWeight.Bold, lineHeight = 22.sp)
+                                            Text(article.summary, color = if (hasRead) Color(0xFF9296A0) else Muted, fontSize = 12.sp, lineHeight = 17.sp, maxLines = 3, overflow = TextOverflow.Ellipsis)
                                             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
                                                 Text(article.published, color = Muted, fontSize = 10.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
-                                                Text("Read story ↗", color = Color(0xFFFF8B93), fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                                Text(if (hasRead) "Read again ↗" else "Read story ↗", color = if (hasRead) Muted else Color(0xFFFF8B93), fontSize = 11.sp, fontWeight = FontWeight.Bold)
                                             }
                                         }
                                     }
                                 }
                             }
-                            Text("Stories are provided by public news sources. Tap a headline to read the full article on its publisher's website.", color = Muted, fontSize = 10.sp, lineHeight = 15.sp)
+                            Text("Tap a story for a clean in-app reader when its full text is publicly available. Subscription or blocked articles open on the publisher's site instead.", color = Muted, fontSize = 10.sp, lineHeight = 15.sp)
                         }
                     }
                     0 -> {
