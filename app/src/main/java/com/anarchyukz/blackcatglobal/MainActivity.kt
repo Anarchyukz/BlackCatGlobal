@@ -390,7 +390,7 @@ private fun BlackCatApp() {
                             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                                 TextButton(onClick = { readerArticle = null; readerContent = ""; readerUnavailable = false }) { Text("← Headlines", color = Color(0xFFFF8B93)) }
                                 Spacer(Modifier.weight(1f))
-                                Text("READER VIEW", color = Muted, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                Text(if (readArticleUrls.contains(article.url)) "✓ READ" else "READER VIEW", color = if (readArticleUrls.contains(article.url)) Color(0xFF8D939E) else Muted, fontSize = 10.sp, fontWeight = FontWeight.Bold)
                             }
                             Text(article.source, color = CatRed, fontSize = 11.sp, fontWeight = FontWeight.ExtraBold)
                             Text(article.title, color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.Black, lineHeight = 30.sp)
