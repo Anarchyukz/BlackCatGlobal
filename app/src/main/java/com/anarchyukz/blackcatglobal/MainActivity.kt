@@ -177,6 +177,9 @@ private fun BlackCatApp() {
     var newsLoading by remember { mutableStateOf(true) }
     var newsArticles by remember { mutableStateOf<List<SunderlandNewsArticle>>(emptyList()) }
     var newsRefreshToken by remember { mutableIntStateOf(0) }
+    var leagueLoading by remember { mutableStateOf(true) }
+    var leagueTeams by remember { mutableStateOf<List<LeagueTableTeam>>(emptyList()) }
+    var leagueRefreshToken by remember { mutableIntStateOf(0) }
     var searchQuery by remember { mutableStateOf("") }
     var analyticsSnapshotLogged by remember { mutableStateOf(false) }
     var checkingUpdate by remember { mutableStateOf(false) }
@@ -196,6 +199,13 @@ private fun BlackCatApp() {
             if (refreshed.isNotEmpty()) newsArticles = refreshed
             newsLoading = false
         }
+    }
+
+    LaunchedEffect(leagueRefreshToken) {
+        leagueLoading = true
+        val table = withContext(Dispatchers.IO) { runCatching { loadPremierLeagueTable() }.getOrDefault(emptyList()) }
+        if (table.isNotEmpty()) leagueTeams = table
+        leagueLoading = false
     }
 
     LaunchedEffect(refreshToken) {
@@ -260,8 +270,8 @@ private fun BlackCatApp() {
                 androidx.compose.material3.NavigationBar(containerColor = Panel, contentColor = Color.White) {
                     val items = listOf(
                         Triple("News", Icons.Filled.Article, 5),
-                        Triple("Match", Icons.Filled.SportsSoccer, 0),
-                        Triple("TV", Icons.Filled.Public, 1),
+                        Triple("TV", Icons.Filled.SportsSoccer, 0),
+                        Triple("League", Icons.Filled.Public, 1),
                         Triple("Team", Icons.Filled.Groups, 2),
                         Triple("Results", Icons.Filled.History, 3),
                         Triple("Search", Icons.Filled.Search, 4)
@@ -298,7 +308,7 @@ private fun BlackCatApp() {
                             Text("SUNDERLAND AFC", color = Muted, fontSize = 9.sp, letterSpacing = 1.5.sp)
                         }
                     }
-                    androidx.compose.material3.IconButton(onClick = { refreshToken++; newsRefreshToken++ }) {
+                    androidx.compose.material3.IconButton(onClick = { refreshToken++; newsRefreshToken++; leagueRefreshToken++ }) {
                         Icon(Icons.Filled.Refresh, contentDescription = "Refresh listings", tint = if (loading) CatRed else Muted)
                     }
                 }
@@ -423,7 +433,7 @@ private fun BlackCatApp() {
                                         Text("WORLDWIDE TV", color = Muted, fontSize = 10.sp, letterSpacing = 1.3.sp, fontWeight = FontWeight.Bold)
                                         Text("${channels.size} channel${if (channels.size == 1) "" else "s"} found", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 15.sp)
                                     }
-                                    androidx.compose.material3.TextButton(onClick = { selectedTab = 1 }) {
+                                    androidx.compose.material3.TextButton(onClick = { selectedTab = 0 }) {
                                         Text("View channels  ›", color = Color(0xFFFF8B93), fontWeight = FontWeight.Bold)
                                     }
                                 }
@@ -505,25 +515,46 @@ private fun BlackCatApp() {
                         }
                     }
                     1 -> {
-                        SectionHeader("WORLDWIDE TV CHANNELS", "Actual named channels found in public match listings")
-                        if (channels.isEmpty()) {
-                            InfoPanel(if (loading) "Searching listings…" else "No broadcaster names found",
-                                "Try refreshing later. A listing is not a guarantee that a channel will show the match in your region.")
-                        } else channels.forEachIndexed { index, channel -> ChannelRow(channel, index + 1) }
-
-                        val streamingServices = remember(data) {
-                            data?.searchResults.orEmpty().flatMap { it.channels }
-                                .filter { isStreamingService(it) }
-                                .map { canonicalChannelName(it) }
-                                .distinctBy { it.lowercase() }
-                                .sortedBy { it.lowercase() }
+                        SectionHeader("PREMIER LEAGUE TABLE", "2026/27 standings · fetched from Google search information")
+                        if (leagueLoading && leagueTeams.isEmpty()) {
+                            InfoPanel("Loading league table…", "Getting the latest Premier League standings.")
+                        } else if (leagueTeams.isEmpty()) {
+                            InfoPanel("League table unavailable", "The standings source did not return a table. Tap refresh to try again.")
+                            androidx.compose.material3.TextButton(onClick = { leagueRefreshToken++ }) {
+                                Text("Try again", color = Color(0xFFFF8B93))
+                            }
+                        } else {
+                            Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = Panel)) {
+                                Column(Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(0.dp)) {
+                                    Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                                        Text("POS", Modifier.width(32.dp), color = Muted, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                                        Text("CLUB", Modifier.weight(1f), color = Muted, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                                        Text("P", Modifier.width(22.dp), color = Muted, fontSize = 9.sp, fontWeight = FontWeight.Bold, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+                                        Text("GD", Modifier.width(34.dp), color = Muted, fontSize = 9.sp, fontWeight = FontWeight.Bold, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+                                        Text("PTS", Modifier.width(30.dp), color = Muted, fontSize = 9.sp, fontWeight = FontWeight.Bold, textAlign = androidx.compose.ui.text.style.TextAlign.End)
+                                    }
+                                    androidx.compose.material3.HorizontalDivider(color = Color(0xFF3A3D45))
+                                    leagueTeams.forEach { team ->
+                                        val isSunderland = team.name.contains("Sunderland", true)
+                                        Row(
+                                            Modifier.fillMaxWidth().background(if (isSunderland) Color(0xFF3A1820) else Color.Transparent).padding(vertical = 9.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Text(team.position.toString(), Modifier.width(32.dp), color = if (isSunderland) Color(0xFFFFA2A8) else Muted, fontSize = 11.sp, fontWeight = if (isSunderland) FontWeight.ExtraBold else FontWeight.Normal)
+                                            Text(team.name, Modifier.weight(1f), color = if (isSunderland) Color.White else Color(0xFFE6E6E6), fontSize = 11.sp, fontWeight = if (isSunderland) FontWeight.ExtraBold else FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                            Text(team.played.toString(), Modifier.width(22.dp), color = Muted, fontSize = 10.sp, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+                                            Text(if (team.goalDifference > 0) "+${team.goalDifference}" else team.goalDifference.toString(), Modifier.width(34.dp), color = Muted, fontSize = 10.sp, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+                                            Text(team.points.toString(), Modifier.width(30.dp), color = if (isSunderland) Color(0xFFFFA2A8) else Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold, textAlign = androidx.compose.ui.text.style.TextAlign.End)
+                                        }
+                                        androidx.compose.material3.HorizontalDivider(color = Color(0xFF303239), thickness = 0.5.dp)
+                                    }
+                                }
+                            }
+                            Text("P = played · GD = goal difference · PTS = points. Standings are sourced from public Google search information and can be delayed; refresh to check for updates.", color = Muted, fontSize = 10.sp, lineHeight = 15.sp)
+                            androidx.compose.material3.TextButton(onClick = { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://www.google.com/search?q=Premier+League+table"))) }) {
+                                Text("Open Google league table ↗", color = Color(0xFFFF8B93))
+                            }
                         }
-                        SectionHeader("STREAMING SERVICES", "Apps and online services listed separately from TV channels")
-                        if (streamingServices.isEmpty()) {
-                            InfoPanel("No streaming services identified yet",
-                                "The app searches for match-specific service listings as well as TV channels.")
-                        } else streamingServices.forEachIndexed { index, service -> ChannelRow(service, index + 1) }
-
                     }
                     2 -> {
                         SectionHeader("TEAM & LINE-UPS", "Confirmed match-day line-ups when published")
