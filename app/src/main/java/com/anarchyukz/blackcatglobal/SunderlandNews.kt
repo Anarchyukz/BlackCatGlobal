@@ -43,3 +43,51 @@ internal fun loadSunderlandNews(): List<SunderlandNewsArticle> {
         )
     }.distinctBy { it.url }.take(30)
 }
+
+
+/**
+ * Extracts readable text already served on a publisher's public page.
+ * Deliberately does not use hidden APIs, scripts, or other techniques to defeat a paywall.
+ * Returns null when the page looks blocked, subscription-gated, or too incomplete to read.
+ */
+internal fun loadPublicArticleText(url: String): String? {
+    if (!url.startsWith("https://") && !url.startsWith("http://")) return null
+
+    val document = Jsoup.connect(url)
+        .userAgent("Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/124.0 Mobile Safari/537.36 BlackCatGlobal/1.0")
+        .timeout(12_000)
+        .followRedirects(true)
+        .get()
+
+    val pageText = document.text().lowercase()
+    val candidate = document.selectFirst(
+        "[itemprop=articleBody], article, main, .article-body, .article__body, .story-body, .story__body, .entry-content, .post-content"
+    ) ?: document.body()
+
+    val readable = candidate.clone()
+    readable.select(
+        "script, style, noscript, nav, header, footer, aside, form, button, iframe, " +
+            ".advert, .advertisement, .ad, .ads, [class*=cookie], [id*=cookie], " +
+            "[class*=newsletter], [class*=related], [class*=recommend], [class*=social], " +
+            "[class*=paywall], [id*=paywall], [class*=subscribe], [id*=subscribe]"
+    ).remove()
+
+    val paragraphs = readable.select("h1, h2, h3, p, blockquote")
+        .map { it.text().replace(Regex("\\s+"), " ").trim() }
+        .filter { it.length >= 35 }
+        .distinct()
+    val text = paragraphs.joinToString("\\n\\n").trim()
+
+    val paywallSignals = listOf(
+        "subscribe to continue", "subscribe to read", "to continue reading",
+        "unlock this article", "already a subscriber", "sign in to read",
+        "register to continue reading", "you have reached your limit",
+        "you've reached your limit", "subscriber-only", "subscribers only",
+        "this article is for subscribers", "read the full story with a subscription"
+    )
+    val appearsGated = paywallSignals.any { pageText.contains(it) }
+    if (appearsGated && text.length < 1800) return null
+    if (text.length < 350 || paragraphs.size < 3) return null
+
+    return text
+}
