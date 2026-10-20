@@ -30,6 +30,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.Article
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.OpenInNew
 import androidx.compose.material3.NavigationBarItem
@@ -172,13 +173,30 @@ private fun BlackCatApp() {
     var loading by remember { mutableStateOf(true) }
     var dashboard by remember { mutableStateOf<DashboardData?>(null) }
     var refreshToken by remember { mutableIntStateOf(0) }
-    var selectedTab by remember { mutableIntStateOf(0) }
+    var selectedTab by remember { mutableIntStateOf(5) }
+    var newsLoading by remember { mutableStateOf(true) }
+    var newsArticles by remember { mutableStateOf<List<SunderlandNewsArticle>>(emptyList()) }
+    var newsRefreshToken by remember { mutableIntStateOf(0) }
     var searchQuery by remember { mutableStateOf("") }
     var analyticsSnapshotLogged by remember { mutableStateOf(false) }
     var checkingUpdate by remember { mutableStateOf(false) }
     var updateMessage by remember { mutableStateOf<String?>(null) }
     var updateInfo by remember { mutableStateOf<GitHubUpdate?>(null) }
     val scope = rememberCoroutineScope()
+
+    LaunchedEffect(newsRefreshToken) {
+        newsLoading = true
+        val firstLoad = withContext(Dispatchers.IO) { runCatching { loadSunderlandNews() }.getOrDefault(emptyList()) }
+        if (firstLoad.isNotEmpty()) newsArticles = firstLoad
+        newsLoading = false
+        while (true) {
+            kotlinx.coroutines.delay(5 * 60_000L)
+            newsLoading = true
+            val refreshed = withContext(Dispatchers.IO) { runCatching { loadSunderlandNews() }.getOrDefault(emptyList()) }
+            if (refreshed.isNotEmpty()) newsArticles = refreshed
+            newsLoading = false
+        }
+    }
 
     LaunchedEffect(refreshToken) {
         loading = true
@@ -241,6 +259,7 @@ private fun BlackCatApp() {
             bottomBar = {
                 androidx.compose.material3.NavigationBar(containerColor = Panel, contentColor = Color.White) {
                     val items = listOf(
+                        Triple("News", Icons.Filled.Article, 5),
                         Triple("Match", Icons.Filled.SportsSoccer, 0),
                         Triple("TV", Icons.Filled.Public, 1),
                         Triple("Team", Icons.Filled.Groups, 2),
@@ -279,12 +298,12 @@ private fun BlackCatApp() {
                             Text("SUNDERLAND AFC", color = Muted, fontSize = 9.sp, letterSpacing = 1.5.sp)
                         }
                     }
-                    androidx.compose.material3.IconButton(onClick = { refreshToken++ }) {
+                    androidx.compose.material3.IconButton(onClick = { refreshToken++; newsRefreshToken++ }) {
                         Icon(Icons.Filled.Refresh, contentDescription = "Refresh listings", tint = if (loading) CatRed else Muted)
                     }
                 }
 
-                if (loading) {
+                if (loading && selectedTab != 5) {
                     Card(
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(12.dp),
@@ -320,6 +339,59 @@ private fun BlackCatApp() {
                 }
 
                 when (selectedTab) {
+                    5 -> {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Box(Modifier.size(8.dp).background(CatRed, RoundedCornerShape(50)))
+                            Text("SUNDERLAND AFC NEWS", color = CatRed, fontWeight = FontWeight.ExtraBold, fontSize = 11.sp, letterSpacing = 1.5.sp)
+                            Spacer(Modifier.weight(1f))
+                            Text("AUTO REFRESH · 5 MIN", color = Muted, fontSize = 9.sp)
+                        }
+                        Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(22.dp), colors = CardDefaults.cardColors(containerColor = Panel)) {
+                            Column(Modifier.fillMaxWidth().background(
+                                androidx.compose.ui.graphics.Brush.linearGradient(listOf(Color(0xFF451820), Color(0xFF24191E), Panel))
+                            ).padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Text("THE LATEST FROM THE BLACK CATS", color = Color(0xFFFFA2A8), fontSize = 10.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 1.5.sp)
+                                Text("Sunderland AFC", color = Color.White, fontSize = 26.sp, fontWeight = FontWeight.Black)
+                                Text("News, transfer stories, match previews and reaction from around the club.", color = Muted, fontSize = 13.sp, lineHeight = 18.sp)
+                            }
+                        }
+                        if (newsLoading && newsArticles.isEmpty()) {
+                            InfoPanel("Loading Sunderland news…", "Fetching the latest headlines from public news sources.")
+                        } else if (newsArticles.isEmpty()) {
+                            InfoPanel("News is temporarily unavailable", "Check your connection and tap refresh to try again.")
+                        } else {
+                            newsArticles.forEach { article ->
+                                Card(
+                                    modifier = Modifier.fillMaxWidth().clickable {
+                                        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(article.url)))
+                                    },
+                                    shape = RoundedCornerShape(18.dp),
+                                    colors = CardDefaults.cardColors(containerColor = Panel)
+                                ) {
+                                    Column(Modifier.fillMaxWidth()) {
+                                        article.imageUrl?.let { imageUrl ->
+                                            AsyncImage(
+                                                model = imageUrl,
+                                                contentDescription = article.title,
+                                                modifier = Modifier.fillMaxWidth().height(180.dp),
+                                                contentScale = ContentScale.Crop
+                                            )
+                                        }
+                                        Column(Modifier.fillMaxWidth().padding(15.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
+                                            Text(article.source.uppercase(), color = CatRed, fontSize = 10.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 1.1.sp)
+                                            Text(article.title, color = Color.White, fontSize = 17.sp, fontWeight = FontWeight.Bold, lineHeight = 22.sp)
+                                            Text(article.summary, color = Muted, fontSize = 12.sp, lineHeight = 17.sp, maxLines = 3, overflow = TextOverflow.Ellipsis)
+                                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
+                                                Text(article.published, color = Muted, fontSize = 10.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                                                Text("Read story ↗", color = Color(0xFFFF8B93), fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            Text("Stories are provided by public news sources. Tap a headline to read the full article on its publisher's website.", color = Muted, fontSize = 10.sp, lineHeight = 15.sp)
+                        }
+                    }
                     0 -> {
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             Box(Modifier.size(8.dp).background(CatRed, RoundedCornerShape(50)))
