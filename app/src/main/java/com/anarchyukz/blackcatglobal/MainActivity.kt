@@ -189,6 +189,8 @@ private fun BlackCatApp() {
     var leagueLoading by remember { mutableStateOf(true) }
     var leagueTeams by remember { mutableStateOf<List<LeagueTableTeam>>(emptyList()) }
     var leagueRefreshToken by remember { mutableIntStateOf(0) }
+    var fixturesLoading by remember { mutableStateOf(true) }
+    var upcomingFixtures by remember { mutableStateOf<List<SunderlandFixture>>(emptyList()) }
     var searchQuery by remember { mutableStateOf("") }
     var analyticsSnapshotLogged by remember { mutableStateOf(false) }
     var checkingUpdate by remember { mutableStateOf(false) }
@@ -218,13 +220,27 @@ private fun BlackCatApp() {
 
     LaunchedEffect(leagueRefreshToken) {
         leagueLoading = true
-        val table = withContext(Dispatchers.IO) { runCatching { loadPremierLeagueTable() }.getOrDefault(emptyList()) }
-        if (table.isNotEmpty()) leagueTeams = table
+        fixturesLoading = true
+        val initial = withContext(Dispatchers.IO) {
+            Pair(
+                runCatching { loadPremierLeagueTable() }.getOrDefault(emptyList()),
+                runCatching { loadSunderlandFixtures() }.getOrDefault(emptyList())
+            )
+        }
+        if (initial.first.isNotEmpty()) leagueTeams = initial.first
+        if (initial.second.isNotEmpty()) upcomingFixtures = initial.second
         leagueLoading = false
+        fixturesLoading = false
         while (true) {
             kotlinx.coroutines.delay(5 * 60_000L)
-            val refreshed = withContext(Dispatchers.IO) { runCatching { loadPremierLeagueTable() }.getOrDefault(emptyList()) }
-            if (refreshed.isNotEmpty()) leagueTeams = refreshed
+            val refreshed = withContext(Dispatchers.IO) {
+                Pair(
+                    runCatching { loadPremierLeagueTable() }.getOrDefault(emptyList()),
+                    runCatching { loadSunderlandFixtures() }.getOrDefault(emptyList())
+                )
+            }
+            if (refreshed.first.isNotEmpty()) leagueTeams = refreshed.first
+            if (refreshed.second.isNotEmpty()) upcomingFixtures = refreshed.second
         }
     }
 
@@ -588,7 +604,7 @@ private fun BlackCatApp() {
                         }
                     }
                     1 -> {
-                        SectionHeader("PREMIER LEAGUE TABLE", "2026/27 standings · fetched from Google search information")
+                        SectionHeader("PREMIER LEAGUE TABLE", "2026/27 standings · public table source")
                         if (leagueLoading && leagueTeams.isEmpty()) {
                             InfoPanel("Loading league table…", "Getting the latest Premier League standings.")
                         } else if (leagueTeams.isEmpty()) {
@@ -623,9 +639,37 @@ private fun BlackCatApp() {
                                     }
                                 }
                             }
-                            Text("P = played · GD = goal difference · PTS = points. Standings are sourced from public Google search information and can be delayed; refresh to check for updates.", color = Muted, fontSize = 10.sp, lineHeight = 15.sp)
-                            androidx.compose.material3.TextButton(onClick = { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://www.google.com/search?q=Premier+League+table"))) }) {
-                                Text("Open Google league table ↗", color = Color(0xFFFF8B93))
+                            Text("P = played · GD = goal difference · PTS = points. Standings refresh automatically every five minutes.", color = Muted, fontSize = 10.sp, lineHeight = 15.sp)
+                            androidx.compose.material3.TextButton(onClick = { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://www.skysports.com/premier-league-table"))) }) {
+                                Text("Open full league table ↗", color = Color(0xFFFF8B93))
+                            }
+                        }
+                        SectionHeader("UPCOMING SUNDERLAND FIXTURES", "Premier League, Europe and domestic cups · UK time")
+                        if (fixturesLoading && upcomingFixtures.isEmpty()) {
+                            InfoPanel("Loading fixtures…", "Checking Sunderland's public fixture listings.")
+                        } else if (upcomingFixtures.isEmpty()) {
+                            InfoPanel("Fixtures temporarily unavailable", "The fixture source did not return readable upcoming matches. Tap refresh to try again.")
+                            androidx.compose.material3.TextButton(onClick = { leagueRefreshToken++ }) {
+                                Text("Retry fixtures", color = Color(0xFFFF8B93))
+                            }
+                        } else {
+                            upcomingFixtures.forEach { fixture ->
+                                Card(
+                                    modifier = Modifier.fillMaxWidth().clickable {
+                                        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(fixture.url)))
+                                    },
+                                    shape = RoundedCornerShape(14.dp),
+                                    colors = CardDefaults.cardColors(containerColor = Panel)
+                                ) {
+                                    Row(Modifier.fillMaxWidth().padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+                                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                                            Text(fixture.competition.uppercase(), color = CatRed, fontSize = 9.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 1.sp)
+                                            Text(if (fixture.venue == "Home") "Sunderland vs ${fixture.opponent}" else "${fixture.opponent} vs Sunderland", color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Bold)
+                                            Text("${fixture.date} · ${fixture.venue}", color = Muted, fontSize = 11.sp)
+                                        }
+                                        Icon(Icons.Filled.OpenInNew, contentDescription = "Open fixture", tint = Muted, modifier = Modifier.size(16.dp))
+                                    }
+                                }
                             }
                         }
                     }
