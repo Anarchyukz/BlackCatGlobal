@@ -446,6 +446,22 @@ private fun BlackCatApp() {
                                                 settings.domStorageEnabled = true
                                                 settings.loadsImagesAutomatically = true
                                                 settings.setSupportMultipleWindows(false)
+                                                // Let the WebView own vertical swipe gestures instead of the
+                                                // surrounding Compose page scrolling over the article.
+                                                isVerticalScrollBarEnabled = true
+                                                isHorizontalScrollBarEnabled = false
+                                                overScrollMode = android.view.View.OVER_SCROLL_IF_CONTENT_SCROLLS
+                                                setOnTouchListener { view, event ->
+                                                    when (event.actionMasked) {
+                                                        android.view.MotionEvent.ACTION_DOWN,
+                                                        android.view.MotionEvent.ACTION_MOVE ->
+                                                            view.parent?.requestDisallowInterceptTouchEvent(true)
+                                                        android.view.MotionEvent.ACTION_UP,
+                                                        android.view.MotionEvent.ACTION_CANCEL ->
+                                                            view.parent?.requestDisallowInterceptTouchEvent(false)
+                                                    }
+                                                    false
+                                                }
                                                 webViewClient = object : WebViewClient() {
                                                     // Keep publisher links and redirects inside Black Cat Global.
                                                     override fun shouldOverrideUrlLoading(
