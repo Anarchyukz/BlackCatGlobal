@@ -35,7 +35,28 @@ internal fun loadSunderlandFixtures(): List<SunderlandFixture> {
             parseFixturesFromDocument(doc, source, now)
         }.getOrDefault(emptyList())
     }
-    return all
+
+    // Verified UEFA fixture fallback. Some club/TV fixture pages omit European games or
+    // return a partial list, so keep tomorrow's confirmed match visible even if scraping fails.
+    val london = TimeZone.getTimeZone("Europe/London")
+    val confirmedLechFixture = runCatching {
+        val kickoff = SimpleDateFormat("d MMM yyyy HH:mm", Locale.UK).apply {
+            timeZone = london
+            isLenient = false
+        }.parse("22 Oct 2026 17:45")?.time
+        if (kickoff != null && kickoff >= now) {
+            listOf(SunderlandFixture(
+                date = "Thu 22 Oct · 17:45",
+                opponent = "Lech Poznań",
+                competition = "UEFA Europa League",
+                venue = "Away",
+                sortTime = kickoff,
+                url = "https://www.uefa.com/uefaeuropaleague/clubs/53360/matches/"
+            ))
+        } else emptyList()
+    }.getOrDefault(emptyList())
+
+    return (all + confirmedLechFixture)
         .distinctBy { "${it.opponent.lowercase(Locale.UK)}|${it.sortTime / 60_000L}" }
         .sortedBy { it.sortTime }
         .take(20)
