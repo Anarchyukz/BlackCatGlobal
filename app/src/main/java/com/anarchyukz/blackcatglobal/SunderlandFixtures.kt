@@ -36,7 +36,7 @@ internal fun loadSunderlandFixtures(): List<SunderlandFixture> {
         }.getOrDefault(emptyList())
     }
     return all
-        .distinctBy { "${it.opponent.lowercase(Locale.UK)}|${it.sortTime / 60_000L}|${it.competition}" }
+        .distinctBy { "${it.opponent.lowercase(Locale.UK)}|${it.sortTime / 60_000L}" }
         .sortedBy { it.sortTime }
         .take(20)
 }
@@ -54,8 +54,10 @@ private fun parseFixturesFromDocument(
         val containsDate = Regex(
             "(?i)\\b\\d{1,2}(?:st|nd|rd|th)?\\s+(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)(?:\\s+20\\d{2})?\\b"
         ).containsMatchIn(nodeText)
-        if (containsDate && !nodeText.contains("Sunderland", true) && nodeText.length <= 160) {
-            dateContext = nodeText
+        if (containsDate && nodeText.length <= 160) {
+            dateContext = if (nodeText.contains("Sunderland", true)) {
+                Regex("(?i)\\b\\d{1,2}(?:st|nd|rd|th)?\\s+(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)(?:\\s+20\\d{2})?\\b").find(nodeText)?.value ?: nodeText
+            } else nodeText
         }
         if (nodeText.contains("Sunderland", true)) {
             parseSunderlandFixture(node, source, now, dateContext)?.let(found::add)
