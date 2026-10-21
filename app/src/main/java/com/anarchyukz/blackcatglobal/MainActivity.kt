@@ -446,7 +446,13 @@ private fun BlackCatApp() {
                                                 settings.domStorageEnabled = true
                                                 settings.loadsImagesAutomatically = true
                                                 settings.setSupportMultipleWindows(false)
-                                                webViewClient = WebViewClient()
+                                                webViewClient = object : WebViewClient() {
+                                                    // Keep publisher links and redirects inside Black Cat Global.
+                                                    override fun shouldOverrideUrlLoading(
+                                                        view: WebView,
+                                                        request: android.webkit.WebResourceRequest
+                                                    ): Boolean = false
+                                                }
                                                 webChromeClient = WebChromeClient()
                                                 loadUrl(readerBrowserUrl!!)
                                                 readerWebView = this
@@ -515,6 +521,9 @@ private fun BlackCatApp() {
                                                 readerContent = extracted.orEmpty()
                                                 readerUnavailable = extracted.isNullOrBlank()
                                                 readerLoading = false
+                                                // If clean public text isn't available, seamlessly show the publisher page
+                                                // in the embedded WebView rather than requiring a second tap.
+                                                if (extracted.isNullOrBlank()) readerBrowserUrl = article.url
                                             }
                                         }
                                     },
@@ -540,7 +549,7 @@ private fun BlackCatApp() {
                                     }
                                 }
                             }
-                            Text("Tap a story for a clean in-app reader when its full text is publicly available. Subscription or blocked articles open on the publisher's site instead.", color = Muted, fontSize = 10.sp, lineHeight = 15.sp)
+                            Text("Tap a story to read it inside Black Cat Global. Public text opens in the clean reader; otherwise the publisher page opens in the in-app browser. Publisher subscriptions still apply.", color = Muted, fontSize = 10.sp, lineHeight = 15.sp)
                         }
                     }
                     0 -> {
