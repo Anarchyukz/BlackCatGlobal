@@ -62,6 +62,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.viewinterop.AndroidView
+import android.webkit.WebView
+import android.webkit.WebViewClient
+import android.webkit.WebChromeClient
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -186,6 +190,8 @@ private fun BlackCatApp() {
     var readerContent by remember { mutableStateOf("") }
     var readerLoading by remember { mutableStateOf(false) }
     var readerUnavailable by remember { mutableStateOf(false) }
+    var readerBrowserUrl by remember { mutableStateOf<String?>(null) }
+    var readerWebView by remember { mutableStateOf<WebView?>(null) }
     var leagueLoading by remember { mutableStateOf(true) }
     var leagueTeams by remember { mutableStateOf<List<LeagueTableTeam>>(emptyList()) }
     var leagueRefreshToken by remember { mutableIntStateOf(0) }
@@ -199,9 +205,18 @@ private fun BlackCatApp() {
     val scope = rememberCoroutineScope()
 
     BackHandler(enabled = readerArticle != null) {
-        readerArticle = null
-        readerContent = ""
-        readerUnavailable = false
+        if (readerBrowserUrl != null) {
+            if (readerWebView?.canGoBack() == true) {
+                readerWebView?.goBack()
+            } else {
+                readerBrowserUrl = null
+                readerWebView = null
+            }
+        } else {
+            readerArticle = null
+            readerContent = ""
+            readerUnavailable = false
+        }
     }
 
     LaunchedEffect(newsRefreshToken) {
@@ -404,7 +419,7 @@ private fun BlackCatApp() {
                         if (readerArticle != null) {
                             val article = readerArticle!!
                             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                                TextButton(onClick = { readerArticle = null; readerContent = ""; readerUnavailable = false }) { Text("← Headlines", color = Color(0xFFFF8B93)) }
+                                TextButton(onClick = { readerBrowserUrl = null; readerArticle = null; readerContent = ""; readerUnavailable = false }) { Text("← Headlines", color = Color(0xFFFF8B93)) }
                                 Spacer(Modifier.weight(1f))
                                 Text(if (readArticleUrls.contains(article.url)) "✓ READ" else "READER VIEW", color = if (readArticleUrls.contains(article.url)) Color(0xFF8D939E) else Muted, fontSize = 10.sp, fontWeight = FontWeight.Bold)
                             }
@@ -413,6 +428,40 @@ private fun BlackCatApp() {
                             Text(article.published, color = Muted, fontSize = 11.sp)
                             androidx.compose.material3.HorizontalDivider(color = Color(0xFF4B343A))
                             when {
+                                readerBrowserUrl != null -> {
+                                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        TextButton(onClick = { if (readerWebView?.canGoBack() == true) readerWebView?.goBack() else readerBrowserUrl = null }) { Text("← Back", color = Color(0xFFFF8B93)) }
+                                        TextButton(onClick = { readerWebView?.reload() }) { Text("Refresh", color = Color(0xFFFF8B93)) }
+                                        Spacer(Modifier.weight(1f))
+                                        TextButton(onClick = { readerBrowserUrl = null; readerWebView = null }) { Text("Close", color = Muted) }
+                                    }
+                                    Text("IN-APP BROWSER · PUBLISHER PAGE", color = Muted, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                                    AndroidView(
+                                        factory = { viewContext ->
+                                            WebView(viewContext).apply {
+                                                settings.javaScriptEnabled = true
+                                                settings.domStorageEnabled = true
+                                                settings.loadsImagesAutomatically = true
+                                                settings.setSupportMultipleWindows(false)
+                                                webViewClient = WebViewClient()
+                                                webChromeClient = WebChromeClient()
+                                                loadUrl(readerBrowserUrl!!)
+                                                readerWebView = this
+                                            }
+                                        },
+                                        modifier = Modifier.fillMaxWidth().height(560.dp),
+                                        update = { view ->
+                                            if (view.url != readerBrowserUrl && !readerBrowserUrl.isNullOrBlank()) view.loadUrl(readerBrowserUrl!!)
+                                            readerWebView = view
+                                        },
+                                        onRelease = { view ->
+                                            view.stopLoading()
+                                            view.destroy()
+                                            if (readerWebView === view) readerWebView = null
+                                        }
+                                    )
+                                    Text("Black Cat Global keeps the page inside the app. Publisher subscriptions and access restrictions still apply.", color = Muted, fontSize = 10.sp, lineHeight = 14.sp)
+                                }
                                 readerLoading -> {
                                     Row(Modifier.fillMaxWidth().padding(vertical = 28.dp), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
                                         CircularProgressIndicator(color = CatRed, modifier = Modifier.size(22.dp), strokeWidth = 2.dp)
@@ -422,10 +471,10 @@ private fun BlackCatApp() {
                                 }
                                 readerUnavailable -> {
                                     InfoPanel("This story needs the publisher's page", "The full article isn't available as public readable text here. It may require a subscription or block reader access, so BlackCat Global won't try to get around that.")
-                                    Button(onClick = { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(article.url))) }, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = CatRed)) {
+                                    Button(onClick = { readerBrowserUrl = article.url; readerUnavailable = false }, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = CatRed)) {
                                         Icon(Icons.Filled.OpenInNew, contentDescription = null)
                                         Spacer(Modifier.width(8.dp))
-                                        Text("Open publisher's article")
+                                        Text("Read in lightweight in-app browser")
                                     }
                                     TextButton(onClick = { readerArticle = null; readerUnavailable = false }, modifier = Modifier.fillMaxWidth()) { Text("Back to headlines", color = Muted) }
                                 }
@@ -434,10 +483,10 @@ private fun BlackCatApp() {
                                         Text(readerContent, modifier = Modifier.fillMaxWidth().padding(18.dp), color = Color(0xFFE9E9ED), fontSize = 16.sp, lineHeight = 25.sp)
                                     }
                                     Text("Clean reader · public article text only", color = Muted, fontSize = 10.sp)
-                                    TextButton(onClick = { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(article.url))) }, modifier = Modifier.fillMaxWidth()) {
+                                    TextButton(onClick = { readerBrowserUrl = article.url }, modifier = Modifier.fillMaxWidth()) {
                                         Icon(Icons.Filled.OpenInNew, contentDescription = null, modifier = Modifier.size(16.dp))
                                         Spacer(Modifier.width(6.dp))
-                                        Text("View original article", color = Color(0xFFFF8B93))
+                                        Text("Open full page in app", color = Color(0xFFFF8B93))
                                     }
                                 }
                             }
