@@ -79,6 +79,45 @@ import java.net.HttpURLConnection
 import java.net.URL
 import java.nio.charset.StandardCharsets
 
+// Lightweight in-app browser ad/tracker filter. This only blocks known advertising
+// and tracking hosts; publisher article content and first-party page requests are left alone.
+private val blockedAdHosts = setOf(
+    "doubleclick.net", "googlesyndication.com", "googleadservices.com",
+    "adservice.google.com", "pagead2.googlesyndication.com", "adnxs.com",
+    "adsrvr.org", "adform.net", "adroll.com", "advertising.com",
+    "taboola.com", "outbrain.com", "mgid.com", "revcontent.com",
+    "criteo.com", "criteo.net", "pubmatic.com", "rubiconproject.com",
+    "openx.net", "openx.com", "casalemedia.com", "smartadserver.com",
+    "adcolony.com", "applovin.com", "unityads.unity3d.com",
+    "moatads.com", "amazon-adsystem.com", "adnxs-simple.com",
+    "scorecardresearch.com", "quantserve.com", "hotjar.com",
+    "branch.io", "app-measurement.com", "connect.facebook.net"
+)
+
+private fun isBlockedAdRequest(rawUrl: String?): Boolean {
+    val host = runCatching { Uri.parse(rawUrl ?: return false).host?.lowercase() }.getOrNull()
+        ?: return false
+    return blockedAdHosts.any { host == it || host.endsWith(".$it") }
+}
+
+private const val AD_CLEANUP_SCRIPT = """
+(function() {
+  const styleId = 'blackcat-ad-cleanup';
+  if (!document.getElementById(styleId)) {
+    const style = document.createElement('style');
+    style.id = styleId;
+    style.textContent = [
+      '[id*="google_ads"], [id^="ad-slot"], [id^="ad-container"],',
+      '[class*="advertisement"], [class*="advertising"], [class*="ad-banner"],',
+      '[class*="ad-container"], [class*="ad-slot"], [class*="sponsor-widget"],',
+      'ins.adsbygoogle, iframe[src*="doubleclick"], iframe[src*="googlesyndication"]',
+      '{display:none!important;visibility:hidden!important;max-height:0!important;min-height:0!important;pointer-events:none!important;}'
+    ].join('');
+    (document.head || document.documentElement).appendChild(style);
+  }
+})();
+"""
+
 private val CatRed = Color(0xFFE53945)
 private val DeepBackground = Color(0xFF101114)
 private val Panel = Color(0xFF1B1D22)
@@ -463,11 +502,31 @@ private fun BlackCatApp() {
                                                     false
                                                 }
                                                 webViewClient = object : WebViewClient() {
+                                                    // Drop requests to known ad/tracker networks before they load.
+                                                    override fun shouldInterceptRequest(
+                                                        view: WebView,
+                                                        request: android.webkit.WebResourceRequest
+                                                    ): android.webkit.WebResourceResponse? {
+                                                        if (isBlockedAdRequest(request.url.toString())) {
+                                                            return android.webkit.WebResourceResponse(
+                                                                "text/plain", "UTF-8",
+                                                                java.io.ByteArrayInputStream(ByteArray(0))
+                                                            )
+                                                        }
+                                                        return super.shouldInterceptRequest(view, request)
+                                                    }
+
                                                     // Keep publisher links and redirects inside Black Cat Global.
                                                     override fun shouldOverrideUrlLoading(
                                                         view: WebView,
                                                         request: android.webkit.WebResourceRequest
-                                                    ): Boolean = false
+                                                    ): Boolean = isBlockedAdRequest(request.url.toString())
+
+                                                    override fun onPageFinished(view: WebView, url: String) {
+                                                        super.onPageFinished(view, url)
+                                                        // Hide common ad slots where a publisher uses first-party ad wrappers.
+                                                        view.evaluateJavascript(AD_CLEANUP_SCRIPT, null)
+                                                    }
                                                 }
                                                 webChromeClient = WebChromeClient()
                                                 loadUrl(readerBrowserUrl!!)
