@@ -275,19 +275,16 @@ private fun BlackCatApp() {
     // Use the dedicated cross-competition fixture feed on the main TV screen too.
     // The dashboard search result can be stale or only include a league fixture.
     val nextSunderlandFixture = upcomingFixtures.minByOrNull { it.sortTime }
+    // Only show channels tied to a Sunderland fixture's own listing card/page.
+    // Generic Google/Bing snippets can mention broadcasters for unrelated matches.
     val freshChannels = remember(data) {
-        (data?.guides.orEmpty().flatMap { it.channels } + data?.searchResults.orEmpty().flatMap { it.channels })
+        data?.guides.orEmpty().flatMap { it.channels }
             .map { canonicalChannelName(it.trim()) }
             .filter { it.isNotBlank() && !isStreamingPlatformNotChannel(it) }
             .distinctBy { it.lowercase() }.sortedBy { it.lowercase() }
     }
-    // Keep the last non-empty set visible while a refresh runs or if a guide temporarily
-    // returns no results. Replace it only when a later refresh finds broadcaster results.
-    var lastKnownChannels by remember { mutableStateOf<List<String>>(emptyList()) }
-    val channels = if (freshChannels.isNotEmpty()) freshChannels else lastKnownChannels
-    LaunchedEffect(freshChannels) {
-        if (freshChannels.isNotEmpty()) lastKnownChannels = freshChannels
-    }
+    // Never carry yesterday's channels forward when the fixture changes or a source fails.
+    val channels = freshChannels
     val filteredChannels = remember(channels, searchQuery) {
         channels.filter { it.contains(searchQuery.trim(), ignoreCase = true) }
     }
@@ -1145,7 +1142,13 @@ private fun loadDashboard(context: android.content.Context): DashboardData {
         // Do not scan the entire page for channel names: that can pick up unrelated
         // competitions, generic streaming-device references, or site-wide promotions.
         // Only show broadcaster names found in the fixture's own nearby listing text.
-        val channels = preciseChannels
+        val fixtureSpecificChannels = if (name == "TV Guide UK" && anchor != null) {
+            extractFixtureSpecificChannels(anchor.absUrl("href"), fixture)
+        } else emptyList()
+        // Prefer a broadcaster extracted from the exact fixture page. Fall back to the
+        // guide's nearby fixture card only when the direct page cannot be read.
+        val channels = (fixtureSpecificChannels.ifEmpty { preciseChannels })
+            .distinctBy { it.lowercase() }
         GuideResult(
             name = name,
             fixture = anchor?.text()?.replace(Regex("\\s+"), " ")?.takeIf { it.isNotBlank() },
@@ -1497,6 +1500,48 @@ private fun parseEspnLineups(jsonText: String): List<LineupTeam> {
  * its channel label. It deliberately starts with the fixture's own ancestors and only
  * falls back to a short nearby body-text window.
  */
+
+/**
+ * Reads broadcaster names from the exact TVGuide.co.uk fixture page rather than
+ * inheriting channels from search-engine snippets or unrelated matches.
+ */
+private fun extractFixtureSpecificChannels(url: String, fixture: String?): List<String> {
+    if (!url.startsWith("https://www.tvguide.co.uk/", ignoreCase = true) ||
+        !url.contains("/sport/football/fixtures/", ignoreCase = true) ||
+        fixture.isNullOrBlank()) return emptyList()
+    return try {
+        val doc = Jsoup.connect(url)
+            .userAgent("Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/124.0 Mobile Safari/537.36")
+            .timeout(9000)
+            .get()
+        val body = doc.body().text().replace(Regex("\\s+"), " ").trim()
+        val sides = fixture.split(Regex("(?i)\\s+(?:v|vs|versus)\\.?\\s+"))
+            .map { it.trim() }.filter { it.length > 2 }
+        if (sides.size < 2 || sides.any { !body.contains(it, ignoreCase = true) }) return emptyList()
+        val markers = listOf("Broadcast details", "TV channel", "Live TV coverage")
+        val markerIndex = markers.map { body.indexOf(it, ignoreCase = true) }
+            .filter { it >= 0 }.minOrNull() ?: return emptyList()
+        val section = body.substring(markerIndex, (markerIndex + 900).coerceAtMost(body.length))
+        val terms = (broadcasterTerms + listOf(
+            "TNT Sports 1", "TNT Sports 2", "TNT Sports 3", "TNT Sports 4",
+            "Sky Sports Main Event", "Sky Sports Football", "Sky Sports+",
+            "BBC One", "BBC Two", "ITV1", "ITV4"
+        )).distinct().sortedByDescending { it.length }
+        val matches = terms.filter { section.contains(it, ignoreCase = true) }
+        matches.filter { candidate ->
+            matches.none { other ->
+                !other.equals(candidate, ignoreCase = true) &&
+                    other.length > candidate.length &&
+                    other.startsWith(candidate, ignoreCase = true)
+            }
+        }.map { canonicalChannelName(it) }
+            .filter { it.isNotBlank() && !isStreamingPlatformNotChannel(it) }
+            .distinctBy { it.lowercase() }
+    } catch (_: Exception) {
+        emptyList()
+    }
+}
+
 private fun extractBroadcastersNearFixture(
     doc: org.jsoup.nodes.Document,
     anchor: org.jsoup.nodes.Element?,
