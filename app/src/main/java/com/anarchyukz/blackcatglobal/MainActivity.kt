@@ -278,7 +278,10 @@ private fun BlackCatApp() {
     // Only show channels tied to a Sunderland fixture's own listing card/page.
     // Generic Google/Bing snippets can mention broadcasters for unrelated matches.
     val freshChannels = remember(data) {
-        data?.guides.orEmpty().flatMap { it.channels }
+        // The headline channel snapshot uses only the dedicated TV Guide UK match page.
+        // Other guides and search results remain available as leads in Search, not as
+        // confirmed channels on the main TV screen.
+        data?.guides.orEmpty().filter { it.name == "TV Guide UK" }.flatMap { it.channels }
             .map { canonicalChannelName(it.trim()) }
             .filter { it.isNotBlank() && !isStreamingPlatformNotChannel(it) }
             .distinctBy { it.lowercase() }.sortedBy { it.lowercase() }
@@ -1145,9 +1148,9 @@ private fun loadDashboard(context: android.content.Context): DashboardData {
         val fixtureSpecificChannels = if (name == "TV Guide UK" && anchor != null) {
             extractFixtureSpecificChannels(anchor.absUrl("href"), fixture)
         } else emptyList()
-        // Prefer a broadcaster extracted from the exact fixture page. Fall back to the
-        // guide's nearby fixture card only when the direct page cannot be read.
-        val channels = (fixtureSpecificChannels.ifEmpty { preciseChannels })
+        // TV Guide UK is the source for the headline channel list: if its exact match
+        // page cannot be verified, do not substitute a nearby card that may be another game.
+        val channels = if (name == "TV Guide UK") fixtureSpecificChannels else preciseChannels
             .distinctBy { it.lowercase() }
         GuideResult(
             name = name,
