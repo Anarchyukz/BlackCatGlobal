@@ -32,9 +32,7 @@ internal fun loadSunderlandFixtures(): List<SunderlandFixture> {
                 .userAgent("Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/124.0 Mobile Safari/537.36")
                 .timeout(15000)
                 .get()
-            doc.select("a, li, article, [class*=fixture], [class*=match], [class*=event]").mapNotNull {
-                parseSunderlandFixture(it, source, now)
-            }
+            parseFixturesFromDocument(doc, source, now)
         }.getOrDefault(emptyList())
     }
     return all
@@ -43,8 +41,33 @@ internal fun loadSunderlandFixtures(): List<SunderlandFixture> {
         .take(20)
 }
 
-private fun parseSunderlandFixture(element: Element, source: String, now: Long): SunderlandFixture? {
-    val text = element.text().replace(Regex("\\s+"), " ").trim()
+private fun parseFixturesFromDocument(
+    doc: org.jsoup.nodes.Document,
+    source: String,
+    now: Long
+): List<SunderlandFixture> {
+    var dateContext: String? = null
+    val found = mutableListOf<SunderlandFixture>()
+    val nodes = doc.select("h1, h2, h3, h4, h5, time, [class*=date], li, article, [class*=fixture], [class*=match], [class*=event], a")
+    for (node in nodes) {
+        val nodeText = node.text().replace(Regex("\\s+"), " ").trim()
+        val containsDate = Regex(
+            "(?i)\\b\\d{1,2}(?:st|nd|rd|th)?\\s+(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)(?:\\s+20\\d{2})?\\b"
+        ).containsMatchIn(nodeText)
+        if (containsDate && !nodeText.contains("Sunderland", true) && nodeText.length <= 160) {
+            dateContext = nodeText
+        }
+        if (nodeText.contains("Sunderland", true)) {
+            parseSunderlandFixture(node, source, now, dateContext)?.let(found::add)
+        }
+    }
+    return found
+}
+
+private fun parseSunderlandFixture(element: Element, source: String, now: Long, dateContext: String? = null): SunderlandFixture? {
+    val rawText = element.text().replace(Regex("\\s+"), " ").trim()
+    val hasOwnDate = Regex("(?i)\\b\\d{1,2}(?:st|nd|rd|th)?\\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)").containsMatchIn(rawText)
+    val text = if (hasOwnDate) rawText else "${dateContext.orEmpty()} $rawText".trim()
     if (text.length !in 15..900 || !text.contains("Sunderland", true)) return null
 
     val dateMatch = Regex(
