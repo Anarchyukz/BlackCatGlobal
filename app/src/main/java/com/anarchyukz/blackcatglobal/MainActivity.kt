@@ -272,6 +272,9 @@ private fun BlackCatApp() {
     }
 
     val data = dashboard
+    // Use the dedicated cross-competition fixture feed on the main TV screen too.
+    // The dashboard search result can be stale or only include a league fixture.
+    val nextSunderlandFixture = upcomingFixtures.minByOrNull { it.sortTime }
     val freshChannels = remember(data) {
         (data?.guides.orEmpty().flatMap { it.channels } + data?.searchResults.orEmpty().flatMap { it.channels })
             .map { canonicalChannelName(it.trim()) }
@@ -558,11 +561,17 @@ private fun BlackCatApp() {
                             ) {
                                 Text("NEXT FIXTURE", color = Color(0xFFFFA2A8), fontSize = 11.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 2.sp)
                                 FixtureMatchup(
-                                    fixture = data?.fixture ?: if (loading) "Finding Sunderland's next match…" else "Fixture unavailable"
+                                    fixture = nextSunderlandFixture?.let {
+                                        if (it.venue == "Home") "Sunderland vs ${it.opponent}" else "${it.opponent} vs Sunderland"
+                                    } ?: data?.fixture ?: if (fixturesLoading || loading) "Finding Sunderland's next match…" else "Fixture unavailable"
                                 )
                                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                     Icon(Icons.Filled.SportsSoccer, contentDescription = null, tint = CatRed, modifier = Modifier.size(19.dp))
-                                    Text(data?.kickoff ?: "Kick-off time will appear when confirmed", color = Muted, fontSize = 13.sp)
+                                    Text(
+                                        nextSunderlandFixture?.let { "${it.competition} · ${it.date} · ${it.venue}" }
+                                            ?: data?.kickoff ?: "Kick-off time will appear when confirmed",
+                                        color = Muted, fontSize = 13.sp, lineHeight = 18.sp
+                                    )
                                 }
                                 androidx.compose.material3.HorizontalDivider(color = Color(0xFF4B343A))
                                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
