@@ -637,7 +637,7 @@ private fun BlackCatApp() {
                                                 // excerpt instead of switching the user into a browser.
                                                 readerContent = extracted?.takeIf { it.isNotBlank() }
                                                     ?: article.summary.takeIf { it.isNotBlank() }
-                                                        ?.let { "PUBLIC EXCERPT\\n\\n$it" }.orEmpty()
+                                                        ?.let { "PUBLIC EXCERPT\n\n$it" }.orEmpty()
                                                 readerUnavailable = readerContent.isBlank()
                                                 readerLoading = false
                                             }
