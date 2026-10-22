@@ -314,13 +314,34 @@ private fun BlackCatApp() {
     // Use the dedicated cross-competition fixture feed on the main TV screen too.
     // The dashboard search result can be stale or only include a league fixture.
     val nextSunderlandFixture = upcomingFixtures.minByOrNull { it.sortTime }
-    // Only show channels tied to a Sunderland fixture's own listing card/page.
-    // Generic Google/Bing snippets can mention broadcasters for unrelated matches.
-    val freshChannels = remember(data) {
-        // The headline channel snapshot uses only the dedicated TV Guide UK match page.
-        // Other guides and search results remain available as leads in Search, not as
-        // confirmed channels on the main TV screen.
-        data?.guides.orEmpty().filter { it.name == "TV Guide UK" }.flatMap { it.channels }
+    // Prefer TV Guide UK's exact match page, but don't leave the channel list blank
+    // when that one source changes its markup or blocks the detail-page request.
+    // Other guide results are only fallback candidates when their own fixture card
+    // names Sunderland and the same opponent; generic search snippets are never used.
+    val freshChannels = remember(data, nextSunderlandFixture) {
+        val targetFixture = nextSunderlandFixture?.let {
+            if (it.venue.equals("Home", true)) "Sunderland vs ${it.opponent}"
+            else "${it.opponent} vs Sunderland"
+        } ?: data?.fixture.orEmpty()
+        fun normalizedFixture(value: String): String =
+            java.text.Normalizer.normalize(value, java.text.Normalizer.Form.NFD)
+                .replace(Regex("\\p{M}+"), "")
+                .lowercase()
+                .replace(Regex("[^a-z0-9]+"), " ")
+                .trim()
+        val target = normalizedFixture(targetFixture)
+        val targetTeams = target.split(Regex("\\s+v(?:s)?\\s+|\\s+versus\\s+"))
+            .map { it.trim() }.filter { it.isNotBlank() }
+        val exactFixtureGuides = data?.guides.orEmpty().filter { guide ->
+            val listed = normalizedFixture(guide.fixture.orEmpty())
+            listed.contains("sunderland") &&
+                (targetTeams.size < 2 || targetTeams.all { team ->
+                    team.split(" ").filter { it.length > 2 }.all { word -> listed.contains(word) }
+                })
+        }
+        val primary = exactFixtureGuides.filter { it.name == "TV Guide UK" }.flatMap { it.channels }
+        val fallback = exactFixtureGuides.filter { it.name != "TV Guide UK" }.flatMap { it.channels }
+        (if (primary.isNotEmpty()) primary else fallback)
             .map { canonicalChannelName(it.trim()) }
             .filter { it.isNotBlank() && !isStreamingPlatformNotChannel(it) }
             .distinctBy { it.lowercase() }.sortedBy { it.lowercase() }
