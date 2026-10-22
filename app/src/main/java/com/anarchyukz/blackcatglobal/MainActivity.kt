@@ -339,9 +339,11 @@ private fun BlackCatApp() {
                     team.split(" ").filter { it.length > 2 }.all { word -> listed.contains(word) }
                 })
         }
-        val primary = exactFixtureGuides.filter { it.name == "TV Guide UK" }.flatMap { it.channels }
-        val fallback = exactFixtureGuides.filter { it.name != "TV Guide UK" }.flatMap { it.channels }
-        (if (primary.isNotEmpty()) primary else fallback)
+        // Combine broadcaster data only from guides whose own fixture card matches
+        // the same two teams. A single source can expose only an international region
+        // (for example beIN SPORTS) while omitting the UK channel; do not let that
+        // source suppress a valid UK listing from another exact-match guide.
+        exactFixtureGuides.flatMap { it.channels }
             .map { canonicalChannelName(it.trim()) }
             .filter { it.isNotBlank() && !isStreamingPlatformNotChannel(it) }
             .distinctBy { it.lowercase() }.sortedBy { it.lowercase() }
@@ -543,13 +545,25 @@ private fun BlackCatApp() {
                                                         request: android.webkit.WebResourceRequest
                                                     ): Boolean = isBlockedAdRequest(request.url.toString())
 
+                                                    // Older WebView navigation paths can call the String overload.
+                                                    override fun shouldOverrideUrlLoading(view: WebView, url: String): Boolean =
+                                                        isBlockedAdRequest(url)
+
                                                     override fun onPageFinished(view: WebView, url: String) {
                                                         super.onPageFinished(view, url)
                                                         // Hide common ad slots where a publisher uses first-party ad wrappers.
                                                         view.evaluateJavascript(AD_CLEANUP_SCRIPT, null)
                                                     }
                                                 }
-                                                webChromeClient = WebChromeClient()
+                                                webChromeClient = object : WebChromeClient() {
+                                                    // Do not let target=_blank / popup links escape to an external browser.
+                                                    override fun onCreateWindow(
+                                                        view: WebView,
+                                                        isDialog: Boolean,
+                                                        isUserGesture: Boolean,
+                                                        resultMsg: android.os.Message
+                                                    ): Boolean = false
+                                                }
                                                 loadUrl(readerBrowserUrl!!)
                                                 readerWebView = this
                                             }
@@ -587,7 +601,11 @@ private fun BlackCatApp() {
                                     Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = Panel)) {
                                         Text(readerContent, modifier = Modifier.fillMaxWidth().padding(18.dp), color = Color(0xFFE9E9ED), fontSize = 16.sp, lineHeight = 25.sp)
                                     }
-                                    Text("Clean reader · public article text only", color = Muted, fontSize = 10.sp)
+                                    Text(
+                                        if (readerContent.startsWith("PUBLIC EXCERPT")) "PUBLIC NEWS EXCERPT · FULL TEXT MAY REQUIRE PUBLISHER ACCESS"
+                                        else "CLEAN READER · PUBLIC ARTICLE TEXT",
+                                        color = Muted, fontSize = 10.sp
+                                    )
                                     TextButton(onClick = { readerBrowserUrl = article.url }, modifier = Modifier.fillMaxWidth()) {
                                         Icon(Icons.Filled.OpenInNew, contentDescription = null, modifier = Modifier.size(16.dp))
                                         Spacer(Modifier.width(6.dp))
@@ -614,12 +632,14 @@ private fun BlackCatApp() {
                                         scope.launch {
                                             val extracted = withContext(Dispatchers.IO) { runCatching { loadPublicArticleText(article.url) }.getOrNull() }
                                             if (readerArticle?.url == article.url) {
-                                                readerContent = extracted.orEmpty()
-                                                readerUnavailable = extracted.isNullOrBlank()
+                                                // Always keep the story in BlackCat's reader. If the publisher
+                                                // blocks full extraction, show the public RSS summary as a labelled
+                                                // excerpt instead of switching the user into a browser.
+                                                readerContent = extracted?.takeIf { it.isNotBlank() }
+                                                    ?: article.summary.takeIf { it.isNotBlank() }
+                                                        ?.let { "PUBLIC EXCERPT\\n\\n$it" }.orEmpty()
+                                                readerUnavailable = readerContent.isBlank()
                                                 readerLoading = false
-                                                // If clean public text isn't available, seamlessly show the publisher page
-                                                // in the embedded WebView rather than requiring a second tap.
-                                                if (extracted.isNullOrBlank()) readerBrowserUrl = article.url
                                             }
                                         }
                                     },
