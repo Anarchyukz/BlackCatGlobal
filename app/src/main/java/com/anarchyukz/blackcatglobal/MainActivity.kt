@@ -157,6 +157,7 @@ private data class DashboardData(
 
 private val broadcasterTerms = listOf(
     // UK and Ireland
+    "Sky Sports Main Event", "Sky Sports Premier League", "Sky Sports Ultra HDR",
     "Sky Sports", "Sky Sports+", "TNT Sports", "Premier Sports", "Viaplay Sports",
     "BBC One", "BBC Two", "ITV1", "ITV4", "LFCTV",
     // North and South America
@@ -1181,13 +1182,21 @@ private fun loadDashboard(context: android.content.Context): DashboardData {
 
     val guides = docs.map { (name, doc) ->
         val anchor = fixture?.let { f ->
+            val fixtureTeams = f.split(Regex("(?i)\\s+v(?:s)?\\.?\\s+|\\s+versus\\s+"))
+                .map { it.trim() }.filter { it.isNotBlank() }
             doc.select("a").firstOrNull { a ->
                 val t = a.text().replace(Regex("\\s+"), " ").trim()
+                val normalizedText = t.lowercase()
+                val teamsMatch = fixtureTeams.size >= 2 && fixtureTeams.all { team ->
+                    if (team.equals("Sunderland", true)) normalizedText.contains("sunderland")
+                    else if (normalizedText.contains(team.lowercase())) true
+                    else team.split(Regex("\\s+"))
+                        .filter { it.length >= 4 && it.lowercase() !in setOf("united", "city", "town", "athletic", "rovers", "county") }
+                        .any { word -> normalizedText.contains(word.lowercase()) }
+                }
                 t.contains("Sunderland", true) &&
-                    (Regex("(?i)\\b(vs?\\.?|versus)\\b").containsMatchIn(t) || t.contains("Sunderland", true)) &&
-                    (f.split(Regex("(?i)\\s+v(?:s)?\\.?\\s+")).any { part ->
-                        part.length > 2 && t.contains(part.trim(), true)
-                    } || t.equals(f, true))
+                    Regex("(?i)\\b(vs?\\.?|versus)\\b").containsMatchIn(t) &&
+                    teamsMatch && t.length < 120
             }
         } ?: doc.select("a").firstOrNull { it.text().contains("Sunderland", true) && it.text().length < 100 }
 
