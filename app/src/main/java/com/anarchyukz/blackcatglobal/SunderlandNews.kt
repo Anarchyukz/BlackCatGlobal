@@ -53,30 +53,31 @@ private fun readRssFeed(feed: NewsRssFeed): List<SunderlandNewsArticle> {
     return try {
         val status = connection.responseCode
         require(status in 200..299) { "RSS request failed with HTTP $status" }
-        val parser = Xml.newPullParser()
-        parser.setFeature(XmlPullParser.FEATURE_PROCESS_NAMESPACES, true)
-        connection.inputStream.use { parser.setInput(it, null) }
+        connection.inputStream.use { stream ->
+            val parser = Xml.newPullParser()
+            parser.setFeature(XmlPullParser.FEATURE_PROCESS_NAMESPACES, true)
+            parser.setInput(stream, null)
 
-        var event = parser.eventType
-        var rootName = ""
-        while (event != XmlPullParser.END_DOCUMENT && event != XmlPullParser.START_TAG) {
-            event = parser.next()
-        }
-        require(event == XmlPullParser.START_TAG) { "Empty RSS response" }
-        rootName = parser.name.substringAfter(':').lowercase()
-        require(rootName == "rss" || rootName == "feed" || rootName == "rdf") {
-            "Response is not RSS/Atom XML (root=$rootName)"
-        }
-
-        val articles = mutableListOf<SunderlandNewsArticle>()
-        while (parser.next() != XmlPullParser.END_DOCUMENT) {
-            if (parser.eventType != XmlPullParser.START_TAG) continue
-            val name = parser.name.substringAfter(':').lowercase()
-            if (name == "item" || name == "entry") {
-                parseFeedItem(parser, name, feed.source)?.let(articles::add)
+            var event = parser.eventType
+            while (event != XmlPullParser.END_DOCUMENT && event != XmlPullParser.START_TAG) {
+                event = parser.next()
             }
+            require(event == XmlPullParser.START_TAG) { "Empty RSS response" }
+            val rootName = parser.name.substringAfter(':').lowercase()
+            require(rootName == "rss" || rootName == "feed" || rootName == "rdf") {
+                "Response is not RSS/Atom XML (root=$rootName)"
+            }
+
+            val articles = mutableListOf<SunderlandNewsArticle>()
+            while (parser.next() != XmlPullParser.END_DOCUMENT) {
+                if (parser.eventType != XmlPullParser.START_TAG) continue
+                val name = parser.name.substringAfter(':').lowercase()
+                if (name == "item" || name == "entry") {
+                    parseFeedItem(parser, name, feed.source)?.let(articles::add)
+                }
+            }
+            articles
         }
-        articles
     } finally {
         connection.disconnect()
     }
