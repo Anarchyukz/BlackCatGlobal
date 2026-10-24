@@ -220,6 +220,7 @@ private fun BlackCatApp() {
     var selectedTab by remember { mutableIntStateOf(5) }
     var newsLoading by remember { mutableStateOf(true) }
     var newsArticles by remember { mutableStateOf<List<SunderlandNewsArticle>>(emptyList()) }
+    var newsCategory by remember { mutableStateOf("General News") }
     var newsRefreshToken by remember { mutableIntStateOf(0) }
     var readArticleUrls by remember {
         mutableStateOf(context.getSharedPreferences("blackcat_news", android.content.Context.MODE_PRIVATE)
@@ -466,6 +467,23 @@ private fun BlackCatApp() {
 
                 when (selectedTab) {
                     5 -> {
+                        val visibleNewsArticles = when (newsCategory) {
+                            "Sunderland AFC" -> newsArticles.filter { article ->
+                                val text = "${article.title} ${article.summary} ${article.source} ${article.url}"
+                                article.source.contains("Roker Report", true) ||
+                                    article.source.contains("Sunderland AFC", true) ||
+                                    article.url.contains("rokerreport.sbnation.com", true) ||
+                                    Regex("(?i)\\b(Sunderland AFC|SAFC|Black Cats|Stadium of Light|Régis Le Bris|Wearside|Roker Report)\\b").containsMatchIn(text)
+                            }
+                            "Local News" -> newsArticles.filterNot { article ->
+                                val text = "${article.title} ${article.summary} ${article.source} ${article.url}"
+                                article.source.contains("Roker Report", true) ||
+                                    article.source.contains("Sunderland AFC", true) ||
+                                    article.url.contains("rokerreport.sbnation.com", true) ||
+                                    Regex("(?i)\\b(Sunderland AFC|SAFC|Black Cats|Stadium of Light|Régis Le Bris|Wearside|Roker Report)\\b").containsMatchIn(text)
+                            }
+                            else -> newsArticles
+                        }
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             verticalAlignment = Alignment.CenterVertically,
@@ -480,11 +498,30 @@ private fun BlackCatApp() {
                             }
                         }
                         Text(
-                            "Headlines from ChronicleLive, Roker Report, The Northern Echo and Sunderland Wire.",
+                            "Choose Sunderland AFC coverage or news from across the local area.",
                             color = Muted,
                             fontSize = 12.sp,
                             lineHeight = 17.sp
                         )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            listOf("General News", "Sunderland AFC", "Local News").forEach { category ->
+                                Button(
+                                    onClick = { newsCategory = category },
+                                    modifier = Modifier.weight(1f).heightIn(min = 42.dp),
+                                    shape = RoundedCornerShape(10.dp),
+                                    contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 5.dp, vertical = 8.dp),
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = if (newsCategory == category) CatRed else Color(0xFF292B31),
+                                        contentColor = Color.White
+                                    )
+                                ) {
+                                    Text(category, fontSize = 10.sp, fontWeight = FontWeight.Bold, maxLines = 2, lineHeight = 12.sp)
+                                }
+                            }
+                        }
                         if (newsLoading && newsArticles.isEmpty()) {
                             Row(
                                 Modifier.fillMaxWidth().padding(vertical = 18.dp),
@@ -494,22 +531,30 @@ private fun BlackCatApp() {
                                 CircularProgressIndicator(modifier = Modifier.size(18.dp), color = CatRed, strokeWidth = 2.dp)
                                 Text("Loading RSS feeds…", color = Muted, fontSize = 12.sp)
                             }
-                        } else if (newsArticles.isEmpty()) {
+                        } else if (visibleNewsArticles.isEmpty()) {
                             Card(
                                 Modifier.fillMaxWidth(),
                                 shape = RoundedCornerShape(16.dp),
                                 colors = CardDefaults.cardColors(containerColor = Panel)
                             ) {
                                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    Text("No RSS headlines available", color = Color.White, fontWeight = FontWeight.Bold)
-                                    Text("The feeds may be temporarily unavailable. Try refreshing.", color = Muted, fontSize = 12.sp)
+                                    Text(
+                                        if (newsArticles.isEmpty()) "No RSS headlines available" else "No headlines in this section",
+                                        color = Color.White,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    Text(
+                                        if (newsArticles.isEmpty()) "The feeds may be temporarily unavailable. Try refreshing." else "Try General News or refresh the RSS feeds for the latest headlines.",
+                                        color = Muted,
+                                        fontSize = 12.sp
+                                    )
                                     Button(onClick = { newsRefreshToken++ }, colors = ButtonDefaults.buttonColors(containerColor = CatRed)) {
                                         Text("Refresh feeds")
                                     }
                                 }
                             }
                         } else {
-                            newsArticles.forEach { article ->
+                            visibleNewsArticles.forEach { article ->
                                 Card(
                                     modifier = Modifier.fillMaxWidth().clickable {
                                         runCatching {
