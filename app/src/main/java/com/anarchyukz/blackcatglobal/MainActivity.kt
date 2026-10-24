@@ -220,7 +220,7 @@ private fun BlackCatApp() {
     var selectedTab by remember { mutableIntStateOf(5) }
     var newsLoading by remember { mutableStateOf(true) }
     var newsArticles by remember { mutableStateOf<List<SunderlandNewsArticle>>(emptyList()) }
-    var newsCategory by remember { mutableStateOf("General News") }
+    var newsCategory by remember { mutableStateOf("Sunderland AFC") }
     var newsRefreshToken by remember { mutableIntStateOf(0) }
     var readArticleUrls by remember {
         mutableStateOf(context.getSharedPreferences("blackcat_news", android.content.Context.MODE_PRIVATE)
@@ -335,11 +335,17 @@ private fun BlackCatApp() {
             .map { it.trim() }.filter { it.isNotBlank() }
         fun mentionsSameFixture(text: String): Boolean {
             val listed = normalizedFixture(text)
-            return listed.contains("sunderland") && targetTeams.size >= 2 &&
-                targetTeams.all { team ->
-                    team.split(Regex("\\s+")).filter { it.length > 2 }
-                        .all { word -> listed.contains(word) }
+            if (!listed.contains("sunderland") || targetTeams.size < 2) return false
+            // Some fixtures are abbreviated by TV guides (e.g. "Leeds" rather than
+            // "Leeds United"). Sunderland-specific pages plus the opponent token still
+            // identify the match; requiring every suffix word incorrectly discarded them.
+            targetTeams.filterNot { it == "sunderland" }.all { team ->
+                if (listed.contains(team)) true else {
+                    val distinguishingWords = team.split(Regex("\\s+"))
+                        .filter { it.length >= 4 && it !in setOf("united", "city", "town", "athletic", "rovers", "county") }
+                    distinguishingWords.any { word -> listed.contains(word) }
                 }
+            }
         }
 
         // Prefer guide cards tied to the exact fixture, but don't let a failed or
@@ -480,26 +486,39 @@ private fun BlackCatApp() {
 
                 when (selectedTab) {
                     5 -> {
-                        val visibleNewsArticles = when (newsCategory) {
-                            "Sunderland AFC" -> newsArticles.filter { article ->
-                                val text = "${article.title} ${article.summary} ${article.source} ${article.url}"
-                                article.source.contains("Roker Report", true) ||
-                                    article.source.contains("Sunderland AFC", true) ||
-                                    article.url.contains("rokerreport.sbnation.com", true) ||
-                                    Regex("(?i)\\b(Sunderland AFC|SAFC|Black Cats|Stadium of Light|Régis Le Bris|Wearside|Roker Report)\\b").containsMatchIn(text)
-                            }.sortedWith(
-                                compareBy<SunderlandNewsArticle> {
-                                    if (it.source.contains("Roker Report", true) || it.url.contains("rokerreport.sbnation.com", true)) 0 else 1
-                                }.thenByDescending { it.published }
-                            )
-                            "Local News" -> newsArticles.filterNot { article ->
-                                val text = "${article.title} ${article.summary} ${article.source} ${article.url}"
-                                article.source.contains("Roker Report", true) ||
-                                    article.source.contains("Sunderland AFC", true) ||
-                                    article.url.contains("rokerreport.sbnation.com", true) ||
-                                    Regex("(?i)\\b(Sunderland AFC|SAFC|Black Cats|Stadium of Light|Régis Le Bris|Wearside|Roker Report)\\b").containsMatchIn(text)
+                        val visibleNewsArticles = remember(newsArticles, newsCategory) {
+                            fun isSunderlandFootball(article: SunderlandNewsArticle): Boolean {
+                                val title = article.title
+                                val source = article.source
+                                val url = article.url.lowercase()
+                                // Feed/domain classification is more reliable than matching broad words
+                                // in article summaries, which caused local stories to leak into AFC news.
+                                if (source.contains("Roker Report", true) ||
+                                    url.contains("rokerreport.sbnation.com") ||
+                                    url.contains("/sport/football/sunderland-afc") ||
+                                    source.contains("ChronicleLive · Sunderland AFC", true) ||
+                                    source.contains("Sunderland Echo Sport", true)) return true
+                                return Regex("(?i)\\b(Sunderland AFC|SAFC|Black Cats|Régis Le Bris|Roker Report|Sunderland v Leeds|Leeds v Sunderland|Sunderland v Brentford|Sunderland v Coventry|Sunderland transfer|Sunderland team news|Sunderland match report)\\b")
+                                    .containsMatchIn(title)
                             }
-                            else -> newsArticles
+                            fun isLocalPublisher(article: SunderlandNewsArticle): Boolean {
+                                val source = article.source.lowercase()
+                                val url = article.url.lowercase()
+                                return source.contains("chroniclelive") || source.contains("sunderland echo") ||
+                                    source.contains("northern echo") || url.contains("chroniclelive.co.uk") ||
+                                    url.contains("sunderlandecho.com") || url.contains("northernecho.co.uk")
+                            }
+                            when (newsCategory) {
+                                "Sunderland AFC" -> newsArticles.filter { isSunderlandFootball(it) }
+                                    .sortedWith(
+                                        compareBy<SunderlandNewsArticle> {
+                                            if (it.source.contains("Roker Report", true) ||
+                                                it.url.contains("rokerreport.sbnation.com", true)) 0 else 1
+                                        }.thenByDescending { it.published }
+                                    )
+                                "Local News" -> newsArticles.filter { isLocalPublisher(it) && !isSunderlandFootball(it) }
+                                else -> newsArticles.filterNot { isSunderlandFootball(it) }
+                            }
                         }
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -524,7 +543,7 @@ private fun BlackCatApp() {
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
-                            listOf("General News", "Sunderland AFC", "Local News").forEach { category ->
+                            listOf("Sunderland AFC", "General News", "Local News").forEach { category ->
                                 Button(
                                     onClick = { newsCategory = category },
                                     modifier = Modifier.weight(1f).heightIn(min = 42.dp),
