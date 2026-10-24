@@ -137,7 +137,9 @@ private data class LineupTeam(
     val name: String,
     val formation: String?,
     val starters: List<String>,
-    val substitutes: List<String>
+    val substitutes: List<String>,
+    val status: String = "CONFIRMED",
+    val source: String = "ESPN"
 )
 
 private data class DashboardData(
@@ -826,7 +828,7 @@ private fun BlackCatApp() {
                         }
                     }
                     2 -> {
-                        SectionHeader("TEAM & LINE-UPS", "Confirmed match-day line-ups when published")
+                        SectionHeader("TEAM & LINE-UPS", "Confirmed XIs when announced · predicted XIs clearly labelled")
                         if (data?.lineups.isNullOrEmpty()) {
                             InfoPanel("Line-ups not available yet",
                                 "Starting XIs are usually published closer to kick-off. The registered squad below is not a confirmed match-day team.")
@@ -841,7 +843,7 @@ private fun BlackCatApp() {
                                 Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                                     Text(team.name.uppercase(), color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Black)
                                     team.formation?.let { Text("Formation  $it", color = Muted, fontSize = 12.sp) }
-                                    Text("STARTING XI", color = CatRed, fontWeight = FontWeight.ExtraBold, fontSize = 11.sp, letterSpacing = 1.5.sp)
+                                    Text("${team.status} STARTING XI · ${team.source}", color = CatRed, fontWeight = FontWeight.ExtraBold, fontSize = 11.sp, letterSpacing = 1.1.sp)
                                     team.starters.forEachIndexed { index, player ->
                                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                                             Text((index + 1).toString().padStart(2, '0'), color = CatRed, fontSize = 11.sp, fontWeight = FontWeight.Bold)
@@ -1454,9 +1456,20 @@ private fun fetchPremierLeagueSquad(): List<String> {
  */
 private fun fetchLineups(fixture: String): List<LineupTeam> {
     val sides = fixture.split(Regex("(?i)\\s+(?:v|vs|versus)\\.?\\s+"))
-        .map { it.trim() }
-        .filter { it.isNotBlank() }
+        .map { it.trim() }.filter { it.isNotBlank() }
     if (sides.size < 2) return emptyList()
+
+    fun normalizeTeam(value: String): String = value.lowercase()
+        .replace(Regex("\\b(afc|fc|united|city|town)\\b"), "")
+        .replace(Regex("[^a-z0-9 ]"), " ")
+        .replace(Regex("\\s+"), " ").trim()
+    fun sameTeam(expected: String, actual: String): Boolean {
+        val e = normalizeTeam(expected)
+        val a = normalizeTeam(actual)
+        if (e.isBlank() || a.isBlank()) return false
+        return e == a || e.startsWith(a) || a.startsWith(e) ||
+            e.split(" ").filter { it.length >= 4 }.any { word -> a.split(" ").contains(word) }
+    }
 
     val now = java.util.Calendar.getInstance(java.util.TimeZone.getTimeZone("UTC"))
     val from = java.text.SimpleDateFormat("yyyyMMdd", java.util.Locale.US).apply {
@@ -1467,16 +1480,13 @@ private fun fetchLineups(fixture: String): List<LineupTeam> {
         timeZone = java.util.TimeZone.getTimeZone("UTC")
     }.format(now.time)
 
-    val candidateEvents = mutableListOf<org.json.JSONObject>()
+    val candidates = mutableListOf<Pair<String, org.json.JSONObject>>()
     for (league in listOf("eng.1", "eng.2")) {
         try {
             val url = "https://site.api.espn.com/apis/site/v2/sports/soccer/$league/scoreboard?dates=$from-$to&limit=100"
-            val jsonText = Jsoup.connect(url)
-                .ignoreContentType(true)
-                .userAgent("Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/124.0 Mobile Safari/537.36")
-                .timeout(10000)
-                .execute().body()
-            val events = org.json.JSONObject(jsonText).optJSONArray("events") ?: continue
+            val body = Jsoup.connect(url).ignoreContentType(true)
+                .userAgent("BlackCatGlobal-Android").timeout(10000).execute().body()
+            val events = org.json.JSONObject(body).optJSONArray("events") ?: continue
             for (i in 0 until events.length()) {
                 val event = events.optJSONObject(i) ?: continue
                 val competitors = event.optJSONObject("competitions")?.optJSONArray("competitors")
@@ -1484,46 +1494,88 @@ private fun fetchLineups(fixture: String): List<LineupTeam> {
                 val names = mutableListOf<String>()
                 if (competitors != null) for (j in 0 until competitors.length()) {
                     val team = competitors.optJSONObject(j)?.optJSONObject("team")
-                    val teamName = team?.optString("displayName").orEmpty()
-                    if (teamName.isNotBlank()) names.add(teamName)
+                    team?.optString("displayName")?.takeIf { it.isNotBlank() }?.let(names::add)
+                    team?.optString("shortDisplayName")?.takeIf { it.isNotBlank() }?.let(names::add)
                 }
-                val eventName = event.optString("name", "")
-                val allNames = (names + eventName).joinToString(" ")
-                if (allNames.contains("Sunderland", ignoreCase = true) &&
-                    sides.all { side ->
-                        val cleaned = side.replace(Regex("(?i)\\b(afc|fc)\\b"), "").trim()
-                        cleaned.length < 4 || allNames.contains(cleaned, ignoreCase = true) ||
-                            cleaned.split(" ").firstOrNull()?.let { allNames.contains(it, ignoreCase = true) } == true
-                    }) {
-                    candidateEvents.add(event)
+                if (names.any { it.contains("Sunderland", true) } &&
+                    sides.all { expected -> names.any { actual -> sameTeam(expected, actual) } }) {
+                    candidates.add(league to event)
                 }
             }
-        } catch (_: Exception) {
-            // Try the other English league; lineup data may not be available from every source.
-        }
+        } catch (_: Exception) { }
     }
 
-    val event = candidateEvents.firstOrNull() ?: return emptyList()
-    val eventId = event.optString("id").takeIf { it.isNotBlank() } ?: return emptyList()
-    return try {
-        val summaryUrl = "https://site.api.espn.com/apis/site/v2/sports/soccer/eng.1/summary?event=$eventId"
-        var summaryText = Jsoup.connect(summaryUrl).ignoreContentType(true)
-            .userAgent("Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/124.0 Mobile Safari/537.36")
-            .timeout(10000).execute().body()
-        var parsed = parseEspnLineups(summaryText)
-        if (parsed.isEmpty()) {
-            // Championship events may need the matching league summary endpoint.
-            summaryText = Jsoup.connect("https://site.api.espn.com/apis/site/v2/sports/soccer/eng.2/summary?event=$eventId")
-                .ignoreContentType(true)
-                .userAgent("Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/124.0 Mobile Safari/537.36")
-                .timeout(10000).execute().body()
-            parsed = parseEspnLineups(summaryText)
-        }
-        parsed
-    } catch (_: Exception) {
-        emptyList()
+    val eventPair = candidates.minByOrNull { (_, event) ->
+        runCatching { java.time.Instant.parse(event.optString("date")).toEpochMilli() }.getOrDefault(Long.MAX_VALUE)
     }
+    if (eventPair != null) {
+        val (league, event) = eventPair
+        val eventId = event.optString("id").takeIf { it.isNotBlank() }
+        if (eventId != null) {
+            for (summaryLeague in listOf(league, "eng.1", "eng.2").distinct()) {
+                val parsed = try {
+                    val url = "https://site.api.espn.com/apis/site/v2/sports/soccer/$summaryLeague/summary?event=$eventId"
+                    val body = Jsoup.connect(url).ignoreContentType(true)
+                        .userAgent("BlackCatGlobal-Android").timeout(10000).execute().body()
+                    parseEspnLineups(body)
+                } catch (_: Exception) { emptyList() }
+                if (parsed.size >= 2 && parsed.all { it.starters.isNotEmpty() }) {
+                    return parsed.map { it.copy(status = "CONFIRMED", source = "ESPN") }
+                }
+            }
+        }
+    }
+    return fetchPredictedLineups(fixture, sides)
 }
+
+private fun fetchPredictedLineups(fixture: String, sides: List<String>): List<LineupTeam> {
+    return try {
+        val query = "\\"$fixture\\" predicted lineups site:sportsmole.co.uk/football"
+        val search = Jsoup.connect("https://www.google.com/search?q=" + enc(query) + "&num=8")
+            .userAgent("Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/124.0 Mobile Safari/537.36")
+            .timeout(9000).get()
+        val articleUrl = search.select("a[href]").mapNotNull { it.absUrl("href").takeIf { url ->
+            url.contains("sportsmole.co.uk/football/", true) &&
+                url.contains("preview", true) && !url.contains("google.com", true)
+        } }.firstOrNull() ?: return emptyList()
+        val doc = Jsoup.connect(articleUrl)
+            .userAgent("Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/124.0 Mobile Safari/537.36")
+            .timeout(10000).get()
+        val text = doc.body().text().replace(Regex("\\s+"), " ")
+        if (!sides.all { side ->
+                val key = normalizeLineupTeam(side)
+                key.isNotBlank() && text.contains(key, true)
+            }) return emptyList()
+
+        val result = mutableListOf<LineupTeam>()
+        for (side in sides) {
+            val aliases = listOf(side, side.replace(Regex("(?i)\\bAFC\\b"), "").trim())
+                .distinct().sortedByDescending { it.length }
+            var names: List<String> = emptyList()
+            for (alias in aliases) {
+                val pattern = Regex(
+                    "(?i)" + Regex.escape(alias) +
+                    "\\s+(?:possible|predicted) starting lineup\\s*:?\\s*(.{20,320}?)(?=\\s+(?:\\w[\\w '&.-]{1,35}\\s+(?:possible|predicted) starting lineup|team news|\\w+ vs\\.?\\s+)|$)"
+                )
+                val match = pattern.find(text)
+                if (match != null) {
+                    names = match.groupValues[1].trim().trimEnd('.', ';').split(Regex("\\s*;\\s*"))
+                        .map { it.trim() }.filter { it.length > 1 && it.length < 60 }
+                    if (names.isNotEmpty()) break
+                }
+            }
+            if (names.size >= 8) {
+                result.add(LineupTeam(side, null, names.take(11), emptyList(), "PREDICTED", "Sports Mole"))
+            }
+        }
+        if (result.size == 2) result else emptyList()
+    } catch (_: Exception) { emptyList() }
+}
+
+private fun normalizeLineupTeam(value: String): String = value.lowercase()
+    .replace(Regex("\\b(afc|fc|united|city|town)\\b"), "")
+    .replace(Regex("[^a-z0-9 ]"), " ")
+    .replace(Regex("\\s+"), " ").trim()
 
 private fun parseEspnLineups(jsonText: String): List<LineupTeam> {
     return try {
