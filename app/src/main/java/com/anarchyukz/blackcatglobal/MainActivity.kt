@@ -333,21 +333,34 @@ private fun BlackCatApp() {
         val target = normalizedFixture(targetFixture)
         val targetTeams = target.split(Regex("\\s+v(?:s)?\\s+|\\s+versus\\s+"))
             .map { it.trim() }.filter { it.isNotBlank() }
-        val exactFixtureGuides = data?.guides.orEmpty().filter { guide ->
-            val listed = normalizedFixture(guide.fixture.orEmpty())
-            listed.contains("sunderland") &&
-                (targetTeams.size < 2 || targetTeams.all { team ->
-                    team.split(" ").filter { it.length > 2 }.all { word -> listed.contains(word) }
-                })
+        fun mentionsSameFixture(text: String): Boolean {
+            val listed = normalizedFixture(text)
+            return listed.contains("sunderland") && targetTeams.size >= 2 &&
+                targetTeams.all { team ->
+                    team.split(Regex("\\s+")).filter { it.length > 2 }
+                        .all { word -> listed.contains(word) }
+                }
         }
-        // Combine broadcaster data only from guides whose own fixture card matches
-        // the same two teams. A single source can expose only an international region
-        // (for example beIN SPORTS) while omitting the UK channel; do not let that
-        // source suppress a valid UK listing from another exact-match guide.
-        exactFixtureGuides.flatMap { it.channels }
+
+        // Prefer guide cards tied to the exact fixture, but don't let a failed or
+        // changed TV Guide UK detail page blank the whole TV screen.
+        val guideChannels = data?.guides.orEmpty()
+            .filter { mentionsSameFixture(it.fixture.orEmpty()) }
+            .flatMap { it.channels }
+
+        // The international search is already queried using this exact fixture.
+        // Use a result only if its own title/snippet names both teams; never use the
+        // hard-coded illustrative examples or generic broadcaster search results.
+        val searchedChannels = data?.searchResults.orEmpty()
+            .filter { it.source != "International match TV listings (unverified)" }
+            .filter { result -> mentionsSameFixture("${result.title} ${result.snippet}") }
+            .flatMap { it.channels }
+
+        (guideChannels + searchedChannels)
             .map { canonicalChannelName(it.trim()) }
             .filter { it.isNotBlank() && !isStreamingPlatformNotChannel(it) }
-            .distinctBy { it.lowercase() }.sortedBy { it.lowercase() }
+            .distinctBy { it.lowercase() }
+            .sortedBy { it.lowercase() }
     }
     // Never carry yesterday's channels forward when the fixture changes or a source fails.
     val channels = freshChannels
