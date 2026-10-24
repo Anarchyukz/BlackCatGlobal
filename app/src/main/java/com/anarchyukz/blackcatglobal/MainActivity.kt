@@ -466,206 +466,87 @@ private fun BlackCatApp() {
 
                 when (selectedTab) {
                     5 -> {
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Box(Modifier.size(8.dp).background(CatRed, RoundedCornerShape(50)))
-                            Text("SUNDERLAND AFC NEWS", color = CatRed, fontWeight = FontWeight.ExtraBold, fontSize = 11.sp, letterSpacing = 1.5.sp)
-                            Spacer(Modifier.weight(1f))
-                            Text("AUTO REFRESH · 5 MIN", color = Muted, fontSize = 9.sp)
-                        }
-                        Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(22.dp), colors = CardDefaults.cardColors(containerColor = Panel)) {
-                            Column(Modifier.fillMaxWidth().background(
-                                androidx.compose.ui.graphics.Brush.linearGradient(listOf(Color(0xFF451820), Color(0xFF24191E), Panel))
-                            ).padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                Text("THE LATEST FROM THE BLACK CATS", color = Color(0xFFFFA2A8), fontSize = 10.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 1.5.sp)
-                                Text("Sunderland AFC", color = Color.White, fontSize = 26.sp, fontWeight = FontWeight.Black)
-                                Text("News, transfer stories, match previews and reaction from around the club.", color = Muted, fontSize = 13.sp, lineHeight = 18.sp)
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                                Text("SUNDERLAND NEWS", color = CatRed, fontWeight = FontWeight.ExtraBold, fontSize = 12.sp, letterSpacing = 1.4.sp)
+                                Text("RSS FEEDS · AUTO-REFRESH EVERY 5 MIN", color = Muted, fontSize = 9.sp)
+                            }
+                            androidx.compose.material3.IconButton(onClick = { newsRefreshToken++ }) {
+                                Icon(Icons.Filled.Refresh, contentDescription = "Refresh RSS feeds", tint = if (newsLoading) CatRed else Muted)
                             }
                         }
-                        if (readerArticle != null) {
-                            val article = readerArticle!!
-                            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                                TextButton(onClick = { readerBrowserUrl = null; readerArticle = null; readerContent = ""; readerUnavailable = false }) { Text("← Headlines", color = Color(0xFFFF8B93)) }
-                                Spacer(Modifier.weight(1f))
-                                Text(if (readArticleUrls.contains(article.url)) "✓ READ" else "READER VIEW", color = if (readArticleUrls.contains(article.url)) Color(0xFF8D939E) else Muted, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                        Text(
+                            "Headlines from ChronicleLive, Roker Report, The Northern Echo and Sunderland Wire.",
+                            color = Muted,
+                            fontSize = 12.sp,
+                            lineHeight = 17.sp
+                        )
+                        if (newsLoading && newsArticles.isEmpty()) {
+                            Row(
+                                Modifier.fillMaxWidth().padding(vertical = 18.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                CircularProgressIndicator(modifier = Modifier.size(18.dp), color = CatRed, strokeWidth = 2.dp)
+                                Text("Loading RSS feeds…", color = Muted, fontSize = 12.sp)
                             }
-                            Text(article.source, color = CatRed, fontSize = 11.sp, fontWeight = FontWeight.ExtraBold)
-                            Text(article.title, color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.Black, lineHeight = 30.sp)
-                            Text(article.published, color = Muted, fontSize = 11.sp)
-                            androidx.compose.material3.HorizontalDivider(color = Color(0xFF4B343A))
-                            when {
-                                readerBrowserUrl != null -> {
-                                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                        TextButton(onClick = { if (readerWebView?.canGoBack() == true) readerWebView?.goBack() else readerBrowserUrl = null }) { Text("← Back", color = Color(0xFFFF8B93)) }
-                                        TextButton(onClick = { readerWebView?.reload() }) { Text("Refresh", color = Color(0xFFFF8B93)) }
-                                        Spacer(Modifier.weight(1f))
-                                        TextButton(onClick = { readerBrowserUrl = null; readerWebView = null }) { Text("Close", color = Muted) }
-                                    }
-                                    Text("IN-APP BROWSER · PUBLISHER PAGE", color = Muted, fontSize = 9.sp, fontWeight = FontWeight.Bold)
-                                    AndroidView(
-                                        factory = { viewContext ->
-                                            WebView(viewContext).apply {
-                                                settings.javaScriptEnabled = true
-                                                settings.domStorageEnabled = true
-                                                settings.loadsImagesAutomatically = true
-                                                settings.setSupportMultipleWindows(false)
-                                                // Let the WebView own vertical swipe gestures instead of the
-                                                // surrounding Compose page scrolling over the article.
-                                                isVerticalScrollBarEnabled = true
-                                                isHorizontalScrollBarEnabled = false
-                                                overScrollMode = android.view.View.OVER_SCROLL_IF_CONTENT_SCROLLS
-                                                setOnTouchListener { view, event ->
-                                                    when (event.actionMasked) {
-                                                        android.view.MotionEvent.ACTION_DOWN,
-                                                        android.view.MotionEvent.ACTION_MOVE ->
-                                                            view.parent?.requestDisallowInterceptTouchEvent(true)
-                                                        android.view.MotionEvent.ACTION_UP,
-                                                        android.view.MotionEvent.ACTION_CANCEL ->
-                                                            view.parent?.requestDisallowInterceptTouchEvent(false)
-                                                    }
-                                                    false
-                                                }
-                                                webViewClient = object : WebViewClient() {
-                                                    // Drop requests to known ad/tracker networks before they load.
-                                                    override fun shouldInterceptRequest(
-                                                        view: WebView,
-                                                        request: android.webkit.WebResourceRequest
-                                                    ): android.webkit.WebResourceResponse? {
-                                                        if (isBlockedAdRequest(request.url.toString())) {
-                                                            return android.webkit.WebResourceResponse(
-                                                                "text/plain", "UTF-8",
-                                                                java.io.ByteArrayInputStream(ByteArray(0))
-                                                            )
-                                                        }
-                                                        return super.shouldInterceptRequest(view, request)
-                                                    }
-
-                                                    // Keep publisher links and redirects inside Black Cat Global.
-                                                    override fun shouldOverrideUrlLoading(
-                                                        view: WebView,
-                                                        request: android.webkit.WebResourceRequest
-                                                    ): Boolean = isBlockedAdRequest(request.url.toString())
-
-                                                    // Older WebView navigation paths can call the String overload.
-                                                    override fun shouldOverrideUrlLoading(view: WebView, url: String): Boolean =
-                                                        isBlockedAdRequest(url)
-
-                                                    override fun onPageFinished(view: WebView, url: String) {
-                                                        super.onPageFinished(view, url)
-                                                        // Hide common ad slots where a publisher uses first-party ad wrappers.
-                                                        view.evaluateJavascript(AD_CLEANUP_SCRIPT, null)
-                                                    }
-                                                }
-                                                webChromeClient = object : WebChromeClient() {
-                                                    // Do not let target=_blank / popup links escape to an external browser.
-                                                    override fun onCreateWindow(
-                                                        view: WebView,
-                                                        isDialog: Boolean,
-                                                        isUserGesture: Boolean,
-                                                        resultMsg: android.os.Message
-                                                    ): Boolean = false
-                                                }
-                                                loadUrl(readerBrowserUrl!!)
-                                                readerWebView = this
-                                            }
-                                        },
-                                        modifier = Modifier.fillMaxWidth().height(560.dp),
-                                        update = { view ->
-                                            if (view.url != readerBrowserUrl && !readerBrowserUrl.isNullOrBlank()) view.loadUrl(readerBrowserUrl!!)
-                                            readerWebView = view
-                                        },
-                                        onRelease = { view ->
-                                            view.stopLoading()
-                                            view.destroy()
-                                            if (readerWebView === view) readerWebView = null
-                                        }
-                                    )
-                                    Text("Black Cat Global keeps the page inside the app. Publisher subscriptions and access restrictions still apply.", color = Muted, fontSize = 10.sp, lineHeight = 14.sp)
-                                }
-                                readerLoading -> {
-                                    Row(Modifier.fillMaxWidth().padding(vertical = 28.dp), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
-                                        CircularProgressIndicator(color = CatRed, modifier = Modifier.size(22.dp), strokeWidth = 2.dp)
-                                        Spacer(Modifier.width(12.dp))
-                                        Text("Preparing article…", color = Muted, fontSize = 13.sp)
-                                    }
-                                }
-                                readerUnavailable -> {
-                                    InfoPanel("This story needs the publisher's page", "The full article isn't available as public readable text here. It may require a subscription or block reader access, so BlackCat Global won't try to get around that.")
-                                    Button(onClick = { readerBrowserUrl = article.url; readerUnavailable = false }, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = CatRed)) {
-                                        Icon(Icons.Filled.OpenInNew, contentDescription = null)
-                                        Spacer(Modifier.width(8.dp))
-                                        Text("Read in lightweight in-app browser")
-                                    }
-                                    TextButton(onClick = { readerArticle = null; readerUnavailable = false }, modifier = Modifier.fillMaxWidth()) { Text("Back to headlines", color = Muted) }
-                                }
-                                else -> {
-                                    Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = Panel)) {
-                                        Text(readerContent, modifier = Modifier.fillMaxWidth().padding(18.dp), color = Color(0xFFE9E9ED), fontSize = 16.sp, lineHeight = 25.sp)
-                                    }
-                                    Text(
-                                        if (readerContent.startsWith("PUBLIC EXCERPT")) "PUBLIC NEWS EXCERPT · FULL TEXT MAY REQUIRE PUBLISHER ACCESS"
-                                        else "CLEAN READER · PUBLIC ARTICLE TEXT",
-                                        color = Muted, fontSize = 10.sp
-                                    )
-                                    TextButton(onClick = { readerBrowserUrl = article.url }, modifier = Modifier.fillMaxWidth()) {
-                                        Icon(Icons.Filled.OpenInNew, contentDescription = null, modifier = Modifier.size(16.dp))
-                                        Spacer(Modifier.width(6.dp))
-                                        Text("Open full page in app", color = Color(0xFFFF8B93))
-                                    }
-                                }
-                            }
-                        } else if (newsLoading && newsArticles.isEmpty()) {
-                            InfoPanel("Loading Sunderland news…", "Fetching the latest headlines from public news sources.")
                         } else if (newsArticles.isEmpty()) {
-                            InfoPanel("News is temporarily unavailable", "Check your connection and tap refresh to try again.")
+                            Card(
+                                Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(16.dp),
+                                colors = CardDefaults.cardColors(containerColor = Panel)
+                            ) {
+                                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    Text("No RSS headlines available", color = Color.White, fontWeight = FontWeight.Bold)
+                                    Text("The feeds may be temporarily unavailable. Try refreshing.", color = Muted, fontSize = 12.sp)
+                                    Button(onClick = { newsRefreshToken++ }, colors = ButtonDefaults.buttonColors(containerColor = CatRed)) {
+                                        Text("Refresh feeds")
+                                    }
+                                }
+                            }
                         } else {
                             newsArticles.forEach { article ->
-                                val hasRead = readArticleUrls.contains(article.url)
                                 Card(
                                     modifier = Modifier.fillMaxWidth().clickable {
-                                        readerArticle = article
-                                        readerContent = ""
-                                        readerLoading = true
-                                        readerUnavailable = false
-                                        val updatedReadUrls = readArticleUrls + article.url
-                                        readArticleUrls = updatedReadUrls
-                                        context.getSharedPreferences("blackcat_news", android.content.Context.MODE_PRIVATE).edit().putStringSet("read_urls", updatedReadUrls).apply()
-                                        scope.launch {
-                                            val extracted = withContext(Dispatchers.IO) { runCatching { loadPublicArticleText(article.url) }.getOrNull() }
-                                            if (readerArticle?.url == article.url) {
-                                                // Always keep the story in BlackCat's reader. If the publisher
-                                                // blocks full extraction, show the public RSS summary as a labelled
-                                                // excerpt instead of switching the user into a browser.
-                                                readerContent = extracted?.takeIf { it.isNotBlank() }
-                                                    ?: article.summary.takeIf { it.isNotBlank() }
-                                                        ?.let { "PUBLIC EXCERPT\n\n$it" }.orEmpty()
-                                                readerUnavailable = readerContent.isBlank()
-                                                readerLoading = false
-                                            }
+                                        runCatching {
+                                            context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(article.url)))
                                         }
                                     },
-                                    shape = RoundedCornerShape(18.dp),
-                                    colors = CardDefaults.cardColors(containerColor = if (hasRead) Color(0xFF17191D) else Panel)
+                                    shape = RoundedCornerShape(16.dp),
+                                    colors = CardDefaults.cardColors(containerColor = Panel)
                                 ) {
                                     Column(Modifier.fillMaxWidth()) {
                                         article.imageUrl?.let { imageUrl ->
-                                            AsyncImage(model = imageUrl, contentDescription = article.title, modifier = Modifier.fillMaxWidth().height(180.dp), contentScale = ContentScale.Crop)
+                                            AsyncImage(
+                                                model = imageUrl,
+                                                contentDescription = article.title,
+                                                modifier = Modifier.fillMaxWidth().height(170.dp),
+                                                contentScale = ContentScale.Crop
+                                            )
                                         }
-                                        Column(Modifier.fillMaxWidth().padding(15.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
-                                            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-                                                Text(article.source.uppercase(), color = if (hasRead) Muted else CatRed, fontSize = 10.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 1.1.sp, modifier = Modifier.weight(1f))
-                                                Text(if (hasRead) "✓ READ" else "NEW", color = if (hasRead) Color(0xFF8D939E) else Color(0xFFFFA2A8), fontSize = 9.sp, fontWeight = FontWeight.ExtraBold)
-                                            }
-                                            Text(article.title, color = if (hasRead) Color(0xFFB8BBC3) else Color.White, fontSize = 17.sp, fontWeight = if (hasRead) FontWeight.Medium else FontWeight.Bold, lineHeight = 22.sp)
-                                            Text(article.summary, color = if (hasRead) Color(0xFF9296A0) else Muted, fontSize = 12.sp, lineHeight = 17.sp, maxLines = 3, overflow = TextOverflow.Ellipsis)
-                                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
+                                        Column(
+                                            Modifier.fillMaxWidth().padding(14.dp),
+                                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                                        ) {
+                                            Text(article.source.uppercase(), color = CatRed, fontSize = 10.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 0.8.sp)
+                                            Text(article.title, color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold, lineHeight = 21.sp)
+                                            Text(article.summary, color = Muted, fontSize = 12.sp, lineHeight = 17.sp, maxLines = 3, overflow = TextOverflow.Ellipsis)
+                                            Row(
+                                                Modifier.fillMaxWidth(),
+                                                horizontalArrangement = Arrangement.SpaceBetween,
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
                                                 Text(article.published, color = Muted, fontSize = 10.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
-                                                Text(if (hasRead) "Read again ↗" else "Read story ↗", color = if (hasRead) Muted else Color(0xFFFF8B93), fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                                Text("OPEN ARTICLE ↗", color = Color(0xFFFF8B93), fontSize = 10.sp, fontWeight = FontWeight.Bold)
                                             }
                                         }
                                     }
                                 }
                             }
-                            Text("Tap a story to read it inside Black Cat Global. Public text opens in the clean reader; otherwise the publisher page opens in the in-app browser. Publisher subscriptions still apply.", color = Muted, fontSize = 10.sp, lineHeight = 15.sp)
                         }
                     }
                     0 -> {
