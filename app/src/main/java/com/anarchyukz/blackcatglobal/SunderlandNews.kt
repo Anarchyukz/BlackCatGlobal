@@ -67,8 +67,12 @@ internal fun loadSunderlandNews(): List<SunderlandNewsArticle> {
                 }.orEmpty()
                 val summaryDoc = Jsoup.parse(rawSummary, Parser.htmlParser())
                 val summary = summaryDoc.text().trim().ifBlank { title }
-                val image = item.selectFirst("enclosure[url], media|content[url], media|thumbnail[url]")
-                    ?.attr("url")?.takeIf { it.startsWith("https://") || it.startsWith("http://") }
+                val feedImage = item.selectFirst("enclosure[url]")?.attr("url")
+                    ?: item.children().firstOrNull {
+                        it.tagName().substringAfter(':').lowercase() in setOf("content", "thumbnail") &&
+                            it.hasAttr("url")
+                    }?.attr("url")
+                val image = feedImage?.takeIf { it.startsWith("https://") || it.startsWith("http://") }
                     ?: summaryDoc.selectFirst("img")?.let { it.attr("abs:src").ifBlank { it.attr("src") } }
                         ?.takeIf { it.startsWith("https://") || it.startsWith("http://") }
 
