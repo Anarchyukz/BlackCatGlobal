@@ -32,6 +32,7 @@ private val sunderlandRssFeeds = listOf(
 )
 
 /**
+ * RSS-only news build: publisher HTML is intentionally never scraped.
  * Strict RSS/Atom reader. It deliberately rejects HTML responses and never scrapes
  * publisher webpages as a fallback. A broken/non-feed URL contributes zero articles.
  */
