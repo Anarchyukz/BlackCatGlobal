@@ -18,17 +18,21 @@ internal data class SunderlandNewsArticle(
 
 private data class NewsRssFeed(val source: String, val url: String)
 
+// Keep Roker Report first so its Sunderland-specific coverage wins when duplicate
+// headlines are syndicated by more than one feed. Articles are still ordered by date.
 private val sunderlandRssFeeds = listOf(
-    NewsRssFeed("ChronicleLive", "https://www.chroniclelive.co.uk/all-about/sunderland?service=rss"),
-    NewsRssFeed("ChronicleLive · Sunderland AFC", "https://www.chroniclelive.co.uk/sport/football/sunderland-afc?service=rss"),
     NewsRssFeed("Roker Report", "https://rokerreport.sbnation.com/rss/current.xml"),
-    NewsRssFeed("The Northern Echo", "https://www.thenorthernecho.co.uk/news/rss/"),
+    NewsRssFeed("ChronicleLive · Sunderland AFC", "https://www.chroniclelive.co.uk/sport/football/sunderland-afc?service=rss"),
+    NewsRssFeed("Sunderland Echo Sport", "https://www.sunderlandecho.com/sport/football/sunderland-afc/rss"),
     NewsRssFeed(
-        "Sunderland Wire",
+        "Sunderland AFC News",
         "https://news.google.com/rss/search?q=" +
-            URLEncoder.encode("site:sunderland.theclubwire.com Sunderland", StandardCharsets.UTF_8.name()) +
+            URLEncoder.encode("Sunderland AFC football news", StandardCharsets.UTF_8.name()) +
             "&hl=en-GB&gl=GB&ceid=GB:en"
-    )
+    ),
+    NewsRssFeed("ChronicleLive · Sunderland", "https://www.chroniclelive.co.uk/all-about/sunderland?service=rss"),
+    NewsRssFeed("Sunderland Echo", "https://www.sunderlandecho.com/rss"),
+    NewsRssFeed("The Northern Echo", "https://www.thenorthernecho.co.uk/news/rss/")
 )
 
 /**
