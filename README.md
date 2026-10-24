@@ -9,6 +9,7 @@ A separate, open-source Android app for finding legal worldwide TV coverage of S
 - Attempts to extract the fixture, kickoff details and broadcaster names from each guide's public page.
 - Merges channel names across guide pages and Google/Bing results, removing case and common naming-alias duplicates.
 - Includes one-tap Google and Bing searches for worldwide, country-by-country listings using the detected fixture.
+- Sunderland news is loaded from RSS/Atom XML feeds only; HTML pages are rejected, never scraped as a fallback.
 - No fixture form, no manual opponent entry, no background polling, and no streams hosted by the app.
 
 ## Important limitations
