@@ -474,7 +474,11 @@ private fun BlackCatApp() {
                                     article.source.contains("Sunderland AFC", true) ||
                                     article.url.contains("rokerreport.sbnation.com", true) ||
                                     Regex("(?i)\\b(Sunderland AFC|SAFC|Black Cats|Stadium of Light|Régis Le Bris|Wearside|Roker Report)\\b").containsMatchIn(text)
-                            }
+                            }.sortedWith(
+                                compareBy<SunderlandNewsArticle> {
+                                    if (it.source.contains("Roker Report", true) || it.url.contains("rokerreport.sbnation.com", true)) 0 else 1
+                                }.thenByDescending { it.published }
+                            )
                             "Local News" -> newsArticles.filterNot { article ->
                                 val text = "${article.title} ${article.summary} ${article.source} ${article.url}"
                                 article.source.contains("Roker Report", true) ||
