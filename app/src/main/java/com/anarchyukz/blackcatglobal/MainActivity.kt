@@ -9,6 +9,8 @@ import androidx.activity.compose.BackHandler
 import com.google.firebase.analytics.FirebaseAnalytics
 import coil.compose.AsyncImage
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -673,37 +675,18 @@ private fun BlackCatApp() {
                         }
                     }
                     0 -> {
-                        // Compact local takeaway promotion: deliberately kept short so it
-                        // sits above the match centre without dominating the TV screen.
+                        // Use the exact user-supplied banner asset, cropped to a compact card.
                         Card(
                             modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(16.dp),
-                            colors = CardDefaults.cardColors(containerColor = Color(0xFF174A78))
+                            colors = CardDefaults.cardColors(containerColor = Panel)
                         ) {
-                            Row(
-                                Modifier.fillMaxWidth()
-                                    .background(
-                                        androidx.compose.ui.graphics.Brush.horizontalGradient(
-                                            listOf(Color(0xFF1765A6), Color(0xFF173B5C), Color(0xFF25242B))
-                                        )
-                                    )
-                                    .padding(horizontal = 16.dp, vertical = 12.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(12.dp)
-                            ) {
-                                Box(
-                                    Modifier.size(42.dp)
-                                        .background(Color(0xFFD91F35), RoundedCornerShape(10.dp)),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Icon(Icons.Filled.SportsSoccer, contentDescription = null, tint = Color.White, modifier = Modifier.size(25.dp))
-                                }
-                                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                                    Text("LOCAL TAKEAWAY", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 1.1.sp)
-                                    Text("DISCOUNTS", color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Black, lineHeight = 22.sp)
-                                }
-                                Text("LOCAL", color = Color(0xFFFFD9DE), fontSize = 9.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 1.sp)
-                            }
+                            Image(
+                                painter = painterResource(id = R.drawable.banner),
+                                contentDescription = "Local takeaway discounts",
+                                modifier = Modifier.fillMaxWidth().height(88.dp),
+                                contentScale = ContentScale.Crop
+                            )
                         }
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             Box(Modifier.size(8.dp).background(CatRed, RoundedCornerShape(50)))
