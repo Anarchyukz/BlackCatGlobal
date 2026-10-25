@@ -175,6 +175,20 @@ private fun parseFeedItem(
         if (parser.eventType != XmlPullParser.START_TAG) continue
 
         val tag = parser.name.substringAfter(':').lowercase()
+        // Media RSS often stores thumbnails in namespaced media:content or
+        // media:thumbnail elements. XmlPullParser exposes the local tag name,
+        // so inspect the URL attribute before treating "content" as article text.
+        val mediaUrl = parser.getAttributeValue(null, "url")
+            ?: parser.getAttributeValue("http://search.yahoo.com/mrss/", "url")
+        if (tag in setOf("enclosure", "thumbnail", "content") &&
+            !mediaUrl.isNullOrBlank() &&
+            (mediaUrl.startsWith("https://", true) || mediaUrl.startsWith("http://", true))
+        ) {
+            if (image == null) image = mediaUrl
+            skipXmlElement(parser)
+            continue
+        }
+
         when (tag) {
             "link" -> {
                 val href = parser.getAttributeValue(null, "href").orEmpty().trim()
@@ -196,12 +210,7 @@ private fun parseFeedItem(
                 val value = readXmlText(parser).trim()
                 if (value.isNotBlank()) source = value
             }
-            "enclosure", "thumbnail" -> {
-                val value = parser.getAttributeValue(null, "url")
-                    ?: parser.getAttributeValue("http://search.yahoo.com/mrss/", "url")
-                if (!value.isNullOrBlank()) image = value
-                skipXmlElement(parser)
-            }
+            "enclosure", "thumbnail" -> skipXmlElement(parser)
             else -> skipXmlElement(parser)
         }
     }
