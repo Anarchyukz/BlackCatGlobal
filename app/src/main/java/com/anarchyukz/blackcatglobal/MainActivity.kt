@@ -402,10 +402,16 @@ private fun BlackCatApp() {
             it.context.orEmpty().contains(searchQuery, true) ||
             it.channels.any { channel -> channel.contains(searchQuery, true) } }
     }
-    val filteredSearchResults = remember(worldwideSearchResults, searchQuery) {
-        worldwideSearchResults.filter { searchQuery.isBlank() ||
-            it.title.contains(searchQuery, true) || it.snippet.contains(searchQuery, true) ||
-            it.channels.any { channel -> channel.contains(searchQuery, true) } }
+    val regionalFallbackResults = remember(data?.fixture) {
+        data?.fixture?.takeIf { it.contains("Sunderland", true) }
+            ?.let { curatedBroadcastResults(it) }.orEmpty()
+    }
+    val filteredSearchResults = remember(worldwideSearchResults, regionalFallbackResults, searchQuery) {
+        (worldwideSearchResults + regionalFallbackResults)
+            .distinctBy { (it.title + "|" + it.region).lowercase() }
+            .filter { searchQuery.isBlank() ||
+                it.title.contains(searchQuery, true) || it.snippet.contains(searchQuery, true) ||
+                it.channels.any { channel -> channel.contains(searchQuery, true) } }
     }
 
     LaunchedEffect(data) {
@@ -521,8 +527,19 @@ private fun BlackCatApp() {
                                     url.contains("/sport/football/sunderland-afc") ||
                                     source.contains("ChronicleLive · Sunderland AFC", true) ||
                                     source.contains("Sunderland Echo Sport", true)) return true
-                                return Regex("(?i)\\b(Sunderland AFC|SAFC|Black Cats|Régis Le Bris|Roker Report|Sunderland v Leeds|Leeds v Sunderland|Sunderland v Brentford|Sunderland v Coventry|Sunderland transfer|Sunderland team news|Sunderland match report)\\b")
-                                    .containsMatchIn(title)
+                                val searchable = "$title ${article.summary}"
+                                val clubMention = Regex(
+                                    "(?i)\\b(Sunderland AFC|SAFC|Black Cats|Sunderland|Régis Le Bris|Roker Report|Wilson Isidor|Dan Neil|Chris Rigg)\\b"
+                                ).containsMatchIn(searchable)
+                                val footballContext = Regex(
+                                    "(?i)\\b(football|transfer|team news|match report|starting XI|line[- ]?up|fixture|Premier League|manager|striker|goal|kick-off|kickoff|league|cup tie|signing|contract)\\b"
+                                ).containsMatchIn(searchable)
+                                val knownAfcPublisher = source.contains("Roker Report", true) ||
+                                    url.contains("rokerreport.sbnation.com") ||
+                                    url.contains("/sport/football/sunderland-afc") ||
+                                    source.contains("ChronicleLive · Sunderland AFC", true) ||
+                                    source.contains("Sunderland Echo Sport", true)
+                                return knownAfcPublisher || (clubMention && footballContext)
                             }
                             fun isLocalPublisher(article: SunderlandNewsArticle): Boolean {
                                 val source = article.source.lowercase()
@@ -1770,7 +1787,8 @@ private fun extractGoogleKickoff(text: String): String? {
 private fun curatedBroadcastResults(fixture: String): List<WebResult> {
     val hasSunderland = fixture.contains("Sunderland", ignoreCase = true)
     val hasBournemouth = fixture.contains("Bournemouth", ignoreCase = true)
-    if (!hasSunderland || !hasBournemouth) return emptyList()
+    if (!hasSunderland) return emptyList()
+    if (!hasBournemouth) return worldwideBroadcastDirectory(fixture)
 
     val matchLabel = "Bournemouth v Sunderland"
     // Match-specific channel names from international fixture listings. Streaming apps are
@@ -1834,6 +1852,44 @@ private fun curatedBroadcastResults(fixture: String): List<WebResult> {
     }
 }
 
+/**
+ * Broad international linear-channel leads for Sunderland fixtures other than the
+ * one legacy match-specific set above. These are not fixture-confirmed: regional
+ * schedules and rights can vary, so the UI labels them as channels to check.
+ */
+private fun worldwideBroadcastDirectory(fixture: String): List<WebResult> {
+    val matchLabel = fixture.replace(Regex("\\s+"), " ").trim()
+    val broadcasts = listOf(
+        "United Kingdom / Ireland" to listOf("Sky Sports+"),
+        "United States" to listOf("USA Network", "NBCSN"),
+        "Brazil" to listOf("ESPN Brasil", "TNT Sports Brasil", "BandSports"),
+        "France" to listOf("Canal+ Live 2", "Canal+ Sport"),
+        "Germany / Austria" to listOf("Sky Sport HD 9", "Sky Sport Premier League"),
+        "Nordics" to listOf("V Sport 1", "V Sport Premier League"),
+        "Bulgaria" to listOf("Nova Sport Bulgaria"),
+        "Bosnia and Herzegovina" to listOf("Arena Sport 5"),
+        "Poland" to listOf("Canal+ Extra 5"),
+        "Czech Republic / Slovakia" to listOf("Canal+ Sport 5"),
+        "Portugal" to listOf("Sport TV"),
+        "Greece" to listOf("Nova Sports Start"),
+        "Iceland" to listOf("SÝN Sport 5"),
+        "South Africa" to listOf("SuperSport Premier League", "MáXimo 360"),
+        "India" to listOf("Star Sports"),
+        "Malaysia" to listOf("Astro Premier League 3"),
+        "Singapore" to listOf("Hub Premier 3"),
+        "New Zealand" to listOf("Sky Sport Premier League"),
+        "Middle East / North Africa" to listOf("beIN SPORTS")
+    )
+    return broadcasts.map { (region, channels) ->
+        WebResult(
+            title = "$matchLabel — $region",
+            snippet = "Regional linear-channel candidates: ${channels.joinToString(", ")}. This is a broadcaster directory, not confirmation that this exact fixture is scheduled; check the local channel guide.",
+            source = "International broadcasters (check fixture)",
+            region = region,
+            channels = channels
+        )
+    }
+}
 private fun fetchWorldwideSearchResults(fixture: String): List<WebResult> {
     // Search match-specific listings by region, not just general Premier League rights pages.
     // Search areas are labels for the query, not claims that every result is confirmed in that territory.
@@ -1857,7 +1913,19 @@ private fun fetchWorldwideSearchResults(fixture: String): List<WebResult> {
         "India" to "\"$fixture\" JioHotstar Star Sports India Premier League broadcast",
         "Asia" to "\"$fixture\" StarHub TV SPOTV Premier League channel",
         "Brazil" to "\"$fixture\" ESPN Brasil TNT Sports Brasil BandSports transmissão",
-        "Portugal" to "\"$fixture\" Sport TV Portugal Premier League transmissão"
+        "Portugal" to "\"$fixture\" Sport TV Portugal Premier League transmissão",
+        "Mexico / Central America" to "\"$fixture\" Sky Sports Mexico Fox Sports Centroamérica Premier League transmisión",
+        "Argentina / Chile" to "\"$fixture\" ESPN Argentina Chile Disney+ Premium fútbol Premier League",
+        "Bulgaria" to "\"$fixture\" Nova Sport Bulgaria Premier League TV",
+        "Balkans" to "\"$fixture\" Arena Sport Sportklub Premier League TV Serbia Croatia Bosnia",
+        "Czech Republic / Slovakia" to "\"$fixture\" Canal+ Sport 5 Premier League Czech Slovakia",
+        "Hungary / Romania" to "\"$fixture\" Match4 Premier League Hungary Digi Sport Romania",
+        "Sub-Saharan Africa" to "\"$fixture\" SuperSport Premier League South Africa Nigeria Ghana channel",
+        "Japan" to "\"$fixture\" Premier League Japan TV channel U-NEXT",
+        "South Korea" to "\"$fixture\" Premier League South Korea TV channel Coupang Play",
+        "China" to "\"$fixture\" Premier League China TV channel Migu",
+        "Southeast Asia" to "\"$fixture\" Premier League Malaysia Singapore Thailand Vietnam TV channel",
+        "Middle East" to "\"$fixture\" Premier League beIN SPORTS channel Qatar Saudi Arabia UAE"
     )
     val agent = "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/124.0 Mobile Safari/537.36"
     // Query regions concurrently: sequential Google + Bing requests could take several
