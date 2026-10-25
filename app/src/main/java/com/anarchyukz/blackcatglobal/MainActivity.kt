@@ -685,30 +685,36 @@ private fun BlackCatApp() {
                                     shape = RoundedCornerShape(16.dp),
                                     colors = CardDefaults.cardColors(containerColor = Panel)
                                 ) {
-                                    Column(Modifier.fillMaxWidth()) {
-                                        article.imageUrl?.let { imageUrl ->
-                                            AsyncImage(
-                                                model = imageUrl,
-                                                contentDescription = article.title,
-                                                modifier = Modifier.fillMaxWidth().height(170.dp),
-                                                contentScale = ContentScale.Crop
-                                            )
-                                        }
-                                        Column(
-                                            Modifier.fillMaxWidth().padding(14.dp),
-                                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                                    Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                            verticalAlignment = Alignment.Top
                                         ) {
-                                            Text(article.source.uppercase(), color = CatRed, fontSize = 10.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 0.8.sp)
-                                            Text(article.title, color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold, lineHeight = 21.sp)
-                                            Text(article.summary, color = Muted, fontSize = 12.sp, lineHeight = 17.sp, maxLines = 3, overflow = TextOverflow.Ellipsis)
-                                            Row(
-                                                Modifier.fillMaxWidth(),
-                                                horizontalArrangement = Arrangement.SpaceBetween,
-                                                verticalAlignment = Alignment.CenterVertically
-                                            ) {
-                                                Text(article.published, color = Muted, fontSize = 10.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
-                                                Text("OPEN ARTICLE ↗", color = Color(0xFFFF8B93), fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                            article.imageUrl?.let { imageUrl ->
+                                                AsyncImage(
+                                                    model = imageUrl,
+                                                    contentDescription = article.title,
+                                                    modifier = Modifier.width(112.dp).height(84.dp),
+                                                    contentScale = ContentScale.Crop
+                                                )
                                             }
+                                            Column(
+                                                modifier = Modifier.weight(1f),
+                                                verticalArrangement = Arrangement.spacedBy(5.dp)
+                                            ) {
+                                                Text(article.source.uppercase(), color = CatRed, fontSize = 10.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 0.8.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                                Text(article.title, color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Bold, lineHeight = 19.sp)
+                                                Text(article.published, color = Muted, fontSize = 10.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                            }
+                                        }
+                                        Text(article.summary, color = Muted, fontSize = 12.sp, lineHeight = 17.sp, maxLines = 3, overflow = TextOverflow.Ellipsis)
+                                        Row(
+                                            Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.End,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Text("OPEN ARTICLE ↗", color = Color(0xFFFF8B93), fontSize = 10.sp, fontWeight = FontWeight.Bold)
                                         }
                                     }
                                 }
