@@ -1283,6 +1283,7 @@ private fun BlackCatApp() {
     }
 }
 
+}
 
 @Composable
 private fun FixtureMatchup(fixture: String) {
