@@ -508,8 +508,12 @@ private fun BlackCatApp() {
                                 val source = article.source.lowercase()
                                 val url = article.url.lowercase()
                                 return source.contains("chroniclelive") || source.contains("sunderland echo") ||
-                                    source.contains("northern echo") || url.contains("chroniclelive.co.uk") ||
-                                    url.contains("sunderlandecho.com") || url.contains("northernecho.co.uk")
+                                    source.contains("northern echo") || source.contains("local news") ||
+                                    source.contains("bbc") || source.contains("itv") ||
+                                    source.contains("shieldsgazette") || source.contains("shields gazette") ||
+                                    url.contains("chroniclelive.co.uk") || url.contains("sunderlandecho.com") ||
+                                    url.contains("northernecho.co.uk") || url.contains("bbc.co.uk") ||
+                                    url.contains("itv.com") || url.contains("shieldsgazette.com")
                             }
                             when (newsCategory) {
                                 "Sunderland AFC" -> newsArticles.filter { isSunderlandFootball(it) }
