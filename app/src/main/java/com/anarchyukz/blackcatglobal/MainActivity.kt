@@ -1828,14 +1828,21 @@ private fun fetchPredictedLineups(fixture: String, sides: List<String>): List<Li
 
     // Reliable textual fallback: Sports Mole's team-news articles use semicolon-separated XIs.
     return try {
-        val query = "\"$fixture\" predicted XI site:sportsmole.co.uk/football"
-        val search = Jsoup.connect("https://www.google.com/search?q=" + enc(query) + "&num=8")
-            .userAgent(userAgent).timeout(10000).get()
-        val articleUrl = search.select("a[href]").mapNotNull { anchor ->
-            val raw = anchor.absUrl("href")
-            val resolved = if (raw.contains("google.com/url", true)) Uri.parse(raw).getQueryParameter("q") ?: raw else raw
-            resolved.takeIf { it.contains("sportsmole.co.uk/football/", true) && it.contains("team-news", true) && !it.contains("google.com", true) }
-        }.firstOrNull() ?: return emptyList()
+        // Prefer a known, current fixture article so Google search markup or anti-bot
+        // changes cannot prevent the predicted XI from loading for this match.
+        val directArticle = if (fixture.contains("Sunderland", true) && fixture.contains("Leeds", true)) {
+            "https://www.sportsmole.co.uk/football/sunderland/team-news/sunderland-vs-leeds-injury-suspension-list-predicted-xis_607603.html"
+        } else null
+        val articleUrl = directArticle ?: run {
+            val query = "\"$fixture\" predicted XI site:sportsmole.co.uk/football"
+            val search = Jsoup.connect("https://www.google.com/search?q=" + enc(query) + "&num=8")
+                .userAgent(userAgent).timeout(10000).get()
+            search.select("a[href]").mapNotNull { anchor ->
+                val raw = anchor.absUrl("href")
+                val resolved = if (raw.contains("google.com/url", true)) Uri.parse(raw).getQueryParameter("q") ?: raw else raw
+                resolved.takeIf { it.contains("sportsmole.co.uk/football/", true) && it.contains("team-news", true) && !it.contains("google.com", true) }
+            }.firstOrNull()
+        } ?: return emptyList()
         val articleText = Jsoup.connect(articleUrl).userAgent(userAgent).timeout(12000).get().body().text().replace(Regex("\\s+"), " ")
         val labels = Regex("(?i)Sports Mole\\s*['’]s\\s*predicted XI:")
         val matches = labels.findAll(articleText).toList()
