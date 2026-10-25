@@ -71,6 +71,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.jsoup.Jsoup
@@ -344,7 +345,7 @@ private fun BlackCatApp() {
         } else {
             worldwideSearchLoading = true
             lineupsLoading = true
-            val channelJob = kotlinx.coroutines.async(Dispatchers.IO) {
+            val channelJob = async(Dispatchers.IO) {
                 runCatching { fetchWorldwideSearchResults(target) }.getOrDefault(emptyList())
             }
             val lineupJob = kotlinx.coroutines.async(Dispatchers.IO) {
@@ -1387,19 +1388,10 @@ private fun loadDashboard(context: android.content.Context): DashboardData {
         if (!kickoff.isNullOrBlank()) fixtureSource = "Google match listing"
     }
 
-    // Use the dedicated fixture feed as the source of truth for TV searches and line-ups.
-    // The scraped guide headline can lag behind when a broadcaster rolls over to the next match.
-    val nextFixtureForFeeds = runCatching { loadSunderlandFixtures().minByOrNull { it.sortTime } }.getOrNull()
-    val fixtureFromFeed = nextFixtureForFeeds?.let {
-        if (it.venue.equals("Home", true)) "Sunderland vs ${it.opponent}" else "${it.opponent} vs Sunderland"
-    }
-    val pinnedFixtureForFeeds = prefs.getString("pinned_fixture", null).takeIf {
-        val pinnedTime = prefs.getLong("pinned_kickoff", 0L)
-        !it.isNullOrBlank() && pinnedTime > 0L && now < pinnedTime + 90L * 60L * 1000L
-    }
-    val fixtureForFeeds = pinnedFixtureForFeeds ?: fixtureFromFeed ?: fixture
-    val searchResults = if (!fixtureForFeeds.isNullOrBlank()) fetchWorldwideSearchResults(fixtureForFeeds) else emptyList()
-    val lineups = if (!fixtureForFeeds.isNullOrBlank()) fetchLineups(fixtureForFeeds) else emptyList()
+    // Search results and line-ups load in their own background task from the UI.
+    // Keep dashboard scraping independent so slow international sources cannot block it.
+    val searchResults = emptyList<WebResult>()
+    val lineups = emptyList<LineupTeam>()
     val squadPlayers = fetchPremierLeagueSquad()
 
     // Keep the selected fixture pinned from kick-off until the end of its 90-minute window.
