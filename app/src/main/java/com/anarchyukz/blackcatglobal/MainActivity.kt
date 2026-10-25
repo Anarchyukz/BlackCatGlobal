@@ -1282,32 +1282,49 @@ private fun ChannelRow(channel: String, number: Int) {
         "canal" in lower -> Color(0xFF263F9D)
         else -> Color(0xFF18354C)
     }
-    // Use the broadcaster's own website favicon/logo rather than a text-only placeholder.
-    // Keep the branded tile as a graceful fallback if a provider blocks remote images.
-    val logoDomain = when {
-        "sky" in lower -> "skysports.com"
-        "tnt" in lower -> "tntsports.co.uk"
-        "bein" in lower -> "beinsports.com"
-        "espn" in lower -> "espn.com"
-        "bbc" in lower -> "bbc.co.uk"
-        "itv" in lower -> "itv.com"
-        "supersport" in lower -> "supersport.com"
-        "dazn" in lower -> "dazn.com"
-        "canal" in lower -> "canalplus.com"
-        "optus" in lower -> "optus.com.au"
-        "peacock" in lower -> "peacocktv.com"
-        "fox" in lower -> "foxsports.com"
-        "sportsnet" in lower -> "sportsnet.ca"
-        "nbc" in lower -> "nbcsports.com"
-        "cbs" in lower -> "cbssports.com"
-        "paramount" in lower -> "paramountplus.com"
-        "prime" in lower || "amazon" in lower -> "primevideo.com"
-        "fubo" in lower -> "fubo.tv"
-        "star sports" in lower -> "hotstar.com"
-        "supersport" in lower -> "supersport.com"
+    // Dedicated broadcaster logo artwork (not browser favicons). Wikimedia Commons
+    // Special:FilePath resolves each maintained logo asset to its image file.
+    val logoUrl = when {
+        "sky sports+" in lower || "sky sports plus" in lower ->
+            "https://commons.wikimedia.org/wiki/Special:FilePath/Sky_Sports_%2B_-_Logo_2025.svg"
+        "sky" in lower ->
+            "https://commons.wikimedia.org/wiki/Special:FilePath/Sky_Sports_2025.svg"
+        "tnt" in lower ->
+            "https://commons.wikimedia.org/wiki/Special:FilePath/TNT_Sports_%282023%29.svg"
+        "bein" in lower ->
+            "https://commons.wikimedia.org/wiki/Special:FilePath/BeIN_Sports_logo.svg"
+        "espn" in lower ->
+            "https://commons.wikimedia.org/wiki/Special:FilePath/ESPN_wordmark.svg"
+        "bbc" in lower ->
+            "https://commons.wikimedia.org/wiki/Special:FilePath/BBC_Sport_logo.svg"
+        "itv" in lower ->
+            "https://commons.wikimedia.org/wiki/Special:FilePath/ITV_logo.svg"
+        "dazn" in lower ->
+            "https://commons.wikimedia.org/wiki/Special:FilePath/DAZN_Logo.svg"
+        "canal" in lower ->
+            "https://commons.wikimedia.org/wiki/Special:FilePath/Canal%2B_logo.svg"
+        "optus" in lower ->
+            "https://commons.wikimedia.org/wiki/Special:FilePath/Optus_Sport_logo.svg"
+        "peacock" in lower ->
+            "https://commons.wikimedia.org/wiki/Special:FilePath/Peacock_TV_logo.svg"
+        "fox" in lower ->
+            "https://commons.wikimedia.org/wiki/Special:FilePath/Fox_Sports_logo.svg"
+        "sportsnet" in lower ->
+            "https://commons.wikimedia.org/wiki/Special:FilePath/Sportsnet_logo.svg"
+        "nbc" in lower ->
+            "https://commons.wikimedia.org/wiki/Special:FilePath/NBC_Sports_logo.svg"
+        "cbs" in lower ->
+            "https://commons.wikimedia.org/wiki/Special:FilePath/CBS_Sports_logo.svg"
+        "paramount" in lower ->
+            "https://commons.wikimedia.org/wiki/Special:FilePath/Paramount%2B_logo.svg"
+        "prime" in lower || "amazon" in lower ->
+            "https://commons.wikimedia.org/wiki/Special:FilePath/Prime_Video_logo.svg"
+        "fubo" in lower ->
+            "https://commons.wikimedia.org/wiki/Special:FilePath/FuboTV_logo.svg"
+        "supersport" in lower ->
+            "https://commons.wikimedia.org/wiki/Special:FilePath/SuperSport_logo.svg"
         else -> null
     }
-    val logoUrl = logoDomain?.let { "https://www.google.com/s2/favicons?domain=$it&sz=128" }
     Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(containerColor = Color(0xFF111820))) {
         Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
