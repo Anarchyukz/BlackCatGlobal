@@ -1062,16 +1062,17 @@ private fun FixtureMatchup(fixture: String) {
                                 val item = teams.optJSONObject(i) ?: continue
                                 val name = item.optString("strTeam")
                                 val candidate = item.optString("strBadge").ifBlank { item.optString("strTeamBadge") }
-                                if (candidate.startsWith("https://") &&
+                                if ((candidate.startsWith("https://", true) || candidate.startsWith("http://", true)) &&
                                     (name.equals(team, true) || name.contains(team, true) || team.contains(name, true))) {
-                                    badge = candidate
+                                    badge = candidate.replaceFirst("http://", "https://", ignoreCase = true)
                                     break
                                 }
                             }
                             if (badge == null && teams.length() > 0) {
                                 val first = teams.optJSONObject(0)
                                 val candidate = first?.optString("strBadge").orEmpty().ifBlank { first?.optString("strTeamBadge").orEmpty() }
-                                badge = candidate.takeIf { it.startsWith("https://") }
+                                badge = candidate.takeIf { it.startsWith("https://", true) || it.startsWith("http://", true) }
+                                    ?.replaceFirst("http://", "https://", ignoreCase = true)
                             }
                         }
                         badge
