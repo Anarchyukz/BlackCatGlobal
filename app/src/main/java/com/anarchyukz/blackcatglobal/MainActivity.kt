@@ -1266,7 +1266,6 @@ private fun BlackCatApp() {
                 }
             }
         }
-    }
 
     if (updateInfo != null && updateInfo!!.versionCode > BuildConfig.VERSION_CODE) {
         AlertDialog(
