@@ -609,6 +609,40 @@ private fun BlackCatApp() {
                 when (selectedTab) {
                     5 -> {
                         val visibleNewsArticles = remember(newsArticles, newsCategory) {
+                            // Hide pirate-stream spam from news results without suppressing ordinary
+                            // match previews, reports, transfer stories or legitimate broadcaster news.
+                            fun isFootballStreamSpam(article: SunderlandNewsArticle): Boolean {
+                                val title = article.title.lowercase()
+                                val summary = article.summary.lowercase()
+                                val url = article.url.lowercase()
+                                val source = article.source.lowercase()
+                                val text = "$title $summary"
+                                val suspiciousHosts = listOf(
+                                    "totalsportek", "footybite", "stream2watch", "crackstreams",
+                                    "livetv.sx", "vipbox", "buffstreams", "rojadirecta",
+                                    "hesgoal", "vipleague", "soccerstreams", "sportshub"
+                                )
+                                if (suspiciousHosts.any { url.contains(it) || source.contains(it) }) return true
+                                val spamPhrases = listOf(
+                                    "football streams", "soccer streams", "free live stream",
+                                    "free football stream", "watch football live free",
+                                    "watch live online free", "live streaming links",
+                                    "free streaming links", "watch matches for free",
+                                    "unofficial stream", "pirated stream", "pirate stream",
+                                    "live match stream links"
+                                )
+                                if (spamPhrases.any { text.contains(it) }) return true
+                                // Generic "watch live" alone is not enough to block a legitimate
+                                // broadcaster article; require a free-stream/link cue as well.
+                                val streamCue = Regex(
+                                    "(?i)\\b(streams?|streaming|watch live)\\b"
+                                ).containsMatchIn(text)
+                                val illegalCue = Regex(
+                                    "(?i)\\b(free|unofficial|pirate[sd]?|illegal|links?|no sign[- ]?up)\\b"
+                                ).containsMatchIn(text)
+                                return streamCue && illegalCue &&
+                                    Regex("(?i)\\b(football|soccer|premier league|sunderland|match)\\b").containsMatchIn(text)
+                            }
                             fun isSunderlandFootball(article: SunderlandNewsArticle): Boolean {
                                 val title = article.title
                                 val source = article.source
@@ -646,7 +680,7 @@ private fun BlackCatApp() {
                                     url.contains("itv.com") || url.contains("shieldsgazette.com")
                             }
                             when (newsCategory) {
-                                "Sunderland AFC" -> newsArticles.filter { isSunderlandFootball(it) }
+                                "Sunderland AFC" -> newsArticles.filter { !isFootballStreamSpam(it) && isSunderlandFootball(it) }
                                     .sortedWith(
                                         compareByDescending<SunderlandNewsArticle> { it.publishedTimestamp }
                                             .thenBy {
@@ -654,9 +688,9 @@ private fun BlackCatApp() {
                                                     it.url.contains("rokerreport.sbnation.com", true)) 0 else 1
                                             }
                                     )
-                                "Local News" -> newsArticles.filter { isLocalPublisher(it) && !isSunderlandFootball(it) }
+                                "Local News" -> newsArticles.filter { !isFootballStreamSpam(it) && isLocalPublisher(it) && !isSunderlandFootball(it) }
                                     .sortedByDescending { it.publishedTimestamp }
-                                else -> newsArticles.filter { isSunderlandFootball(it) }
+                                else -> newsArticles.filter { !isFootballStreamSpam(it) && isSunderlandFootball(it) }
                                     .sortedByDescending { it.publishedTimestamp }
                             }
                         }
