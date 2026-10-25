@@ -1077,6 +1077,30 @@ private fun BlackCatApp() {
                                         Spacer(Modifier.width(6.dp))
                                         Text(if (isPlaying) "Pause" else "Play")
                                     }
+                                    androidx.compose.material3.FilledTonalButton(
+                                        onClick = {
+                                            if (player.mediaItemCount > 0) {
+                                                player.seekTo((player.currentPosition - 15_000L).coerceAtLeast(0L))
+                                            }
+                                        },
+                                        enabled = player.mediaItemCount > 0,
+                                        contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 10.dp, vertical = 8.dp)
+                                    ) {
+                                        Text("−15s", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                    }
+                                    androidx.compose.material3.FilledTonalButton(
+                                        onClick = {
+                                            if (player.mediaItemCount > 0) {
+                                                val target = player.currentPosition + 30_000L
+                                                val duration = player.duration
+                                                player.seekTo(if (duration > 0L) target.coerceAtMost(duration) else target)
+                                            }
+                                        },
+                                        enabled = player.mediaItemCount > 0,
+                                        contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 10.dp, vertical = 8.dp)
+                                    ) {
+                                        Text("+30s", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                    }
                                     Column(Modifier.weight(1f)) {
                                         Text("${formatPodcastTime(playbackPosition)} / ${formatPodcastTime(playbackDuration)}", color = Muted, fontSize = 11.sp)
                                         androidx.compose.material3.Slider(
