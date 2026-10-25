@@ -348,7 +348,7 @@ private fun BlackCatApp() {
             val channelJob = async(Dispatchers.IO) {
                 runCatching { fetchWorldwideSearchResults(target) }.getOrDefault(emptyList())
             }
-            val lineupJob = kotlinx.coroutines.async(Dispatchers.IO) {
+            val lineupJob = async(Dispatchers.IO) {
                 runCatching { fetchLineups(target) }.getOrDefault(emptyList())
             }
             worldwideSearchResults = channelJob.await()
@@ -361,10 +361,10 @@ private fun BlackCatApp() {
             val target = selectedFixtureForLiveData() ?: continue
             worldwideSearchLoading = true
             lineupsLoading = true
-            val channelJob = kotlinx.coroutines.async(Dispatchers.IO) {
+            val channelJob = async(Dispatchers.IO) {
                 runCatching { fetchWorldwideSearchResults(target) }.getOrDefault(emptyList())
             }
-            val lineupJob = kotlinx.coroutines.async(Dispatchers.IO) {
+            val lineupJob = async(Dispatchers.IO) {
                 runCatching { fetchLineups(target) }.getOrDefault(emptyList())
             }
             worldwideSearchResults = channelJob.await()
@@ -378,7 +378,7 @@ private fun BlackCatApp() {
     // when that one source changes its markup or blocks the detail-page request.
     // Other guide results are only fallback candidates when their own fixture card
     // names Sunderland and the same opponent; generic search snippets are never used.
-    val freshChannels = remember(data, nextSunderlandFixture) {
+    val freshChannels = remember(data, nextSunderlandFixture, worldwideSearchResults) {
         val targetFixture = nextSunderlandFixture?.let {
             if (it.venue.equals("Home", true)) "Sunderland vs ${it.opponent}"
             else "${it.opponent} vs Sunderland"
