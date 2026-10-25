@@ -1690,98 +1690,99 @@ private fun fetchLineups(fixture: String): List<LineupTeam> {
 private fun fetchPredictedLineups(fixture: String, sides: List<String>): List<LineupTeam> {
     val userAgent = "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/124.0 Mobile Safari/537.36"
 
-    fun cleanTeamName(value: String): String = normalizeLineupTeam(value)
+    fun norm(value: String): String = normalizeLineupTeam(value)
         .replace(Regex("\\b(afc|fc|united|city|town)\\b"), "")
         .replace(Regex("\\s+"), " ").trim()
 
-    fun parseLikelyLineups(url: String): List<LineupTeam> {
-        val body = Jsoup.connect(url).userAgent(userAgent).timeout(12000).get()
-            .body().text().replace(Regex("\\s+"), " ")
+    fun parseLikelyPage(url: String): List<LineupTeam> {
+        val doc = Jsoup.connect(url).userAgent(userAgent).timeout(15000).get()
+        val body = doc.body().text().replace(Regex("\\s+"), " ")
         val result = mutableListOf<LineupTeam>()
         for (side in sides) {
-            val key = cleanTeamName(side)
-            val words = key.split(" ").filter { it.length >= 3 }
-            val headings = Regex("(?i)([A-Za-zÀ-ÿ.'’-]+(?:\\s+[A-Za-zÀ-ÿ.'’-]+){0,3})\\s+predicted lineup")
-                .findAll(body).toList()
-            val heading = headings.firstOrNull { match ->
-                val headingKey = cleanTeamName(match.groupValues[1])
-                headingKey == key || key == headingKey ||
-                    (words.isNotEmpty() && words.all { word -> headingKey.contains(word) })
-            } ?: continue
-            val from = heading.range.last + 1
-            val nextHeading = headings.firstOrNull { it.range.first > heading.range.first }
-            val section = body.substring(from, nextHeading?.range?.first ?: minOf(body.length, from + 2600))
-            val formation = Regex("(?i)Formation\\s+([0-9-]{3,9})").find(section)?.groupValues?.get(1)
-            val likely = section.indexOf("Likely XI", ignoreCase = true)
-            val confirmed = section.indexOf("Confirmed", ignoreCase = true)
+            val sideWords = norm(side).split(" ").filter { it.length >= 3 }
+            val teamHeading = Regex("(?i)([A-Za-zÀ-ÿ.'’&-]+(?:\\s+[A-Za-zÀ-ÿ.'’&-]+){0,4})\\s+predicted lineup")
+                .findAll(body).firstOrNull { m ->
+                    val heading = norm(m.groupValues[1])
+                    heading == norm(side) || (sideWords.isNotEmpty() && sideWords.all { heading.contains(it) })
+                } ?: continue
+
+            val afterHeading = teamHeading.range.last + 1
+            val nextTeamHeading = Regex("(?i)[A-Za-zÀ-ÿ.'’&-]+(?:\\s+[A-Za-zÀ-ÿ.'’&-]+){0,4}\\s+predicted lineup")
+                .find(body, afterHeading)
+            val section = body.substring(afterHeading, nextTeamHeading?.range?.first ?: minOf(body.length, afterHeading + 3500))
+            val formation = Regex("(?i)Formation\\s+([0-9]+(?:-[0-9]+){1,3})").find(section)?.groupValues?.get(1)
+            val likelyIndex = section.indexOf("Likely XI", ignoreCase = true)
+            val confirmedIndex = section.indexOf("Confirmed XI", ignoreCase = true)
             val listStart = when {
-                likely >= 0 -> likely + "Likely XI".length
-                confirmed >= 0 -> confirmed + "Confirmed".length
+                likelyIndex >= 0 -> likelyIndex + "Likely XI".length
+                confirmedIndex >= 0 -> confirmedIndex + "Confirmed XI".length
                 else -> continue
             }
-            // "Projected from the last 6 matches" appears BEFORE the numbered player list.
-            // Do not truncate at that phrase: doing so discarded all eleven players.
-            val xiText = section.substring(listStart)
-                .substringBefore("Team news", missingDelimiterValue = section.substring(listStart))
-                .substringBefore("Injuries", missingDelimiterValue = section.substring(listStart))
-            val players = Regex("(?i)\\d+\\.\\s+\\d+\\s+(.+?)\\s+[GDMF](?=\\s+\\d+\\.\\s+\\d+\\s+|\\s*$)")
-                .findAll(xiText)
+            // Keep the numbered player list: the "Projected from..." sentence comes before it.
+            val listText = section.substring(listStart)
+                .substringBefore("Team news")
+                .substringBefore("Injuries")
+                .substringBefore("Unavailable")
+                .substringBefore("Doubtful")
+            val players = Regex("(?i)\\d+\\.\\s+\\d+\\s+(.+?)\\s+([GDMF])(?=\\s+\\d+\\.\\s+\\d+\\s+|\\s*$)")
+                .findAll(listText)
                 .map { it.groupValues[1].trim().trimEnd(',', '.') }
                 .filter { it.length in 2..60 }
                 .distinct()
                 .take(11)
                 .toList()
             if (players.size >= 8) {
-                val status = if (confirmed >= 0 && (likely < 0 || confirmed < likely)) "CONFIRMED" else "PREDICTED"
-                result.add(LineupTeam(side, formation, players, emptyList(), status, "Likely Lineups"))
+                val isConfirmed = confirmedIndex >= 0 && (likelyIndex < 0 || confirmedIndex < likelyIndex)
+                result.add(LineupTeam(side, formation, players, emptyList(), if (isConfirmed) "CONFIRMED" else "PREDICTED", "Likely Lineups"))
             }
         }
         return result
     }
 
-    // Use the known page directly for Sunderland–Leeds, then discover the relevant
-    // fixture page for other Premier League matches instead of hard-coding one fixture.
-    val directUrl = if (fixture.contains("Sunderland", true) && fixture.contains("Leeds", true)) {
-        "https://likelylineups.com/sunderland-vs-leeds-united-lineups/"
-    } else null
-    if (directUrl != null) {
-        runCatching { parseLikelyLineups(directUrl) }.getOrNull()
-            ?.takeIf { it.size == sides.size }?.let { return it }
-    }
-
-    val likelyUrl = runCatching {
+    val directUrls = buildList {
+        if (fixture.contains("Sunderland", true) && fixture.contains("Leeds", true)) {
+            add("https://likelylineups.com/sunderland-vs-leeds-united-lineups/")
+        }
         val query = "\"$fixture\" lineups site:likelylineups.com"
-        val search = Jsoup.connect("https://www.google.com/search?q=" + enc(query) + "&num=8")
-            .userAgent(userAgent).timeout(10000).get()
-        search.select("a[href]").mapNotNull { anchor ->
-            val raw = anchor.absUrl("href")
-            val resolved = if (raw.contains("google.com/url", true)) Uri.parse(raw).getQueryParameter("q") ?: raw else raw
-            resolved.takeIf { it.contains("likelylineups.com/", true) &&
-                it.contains("lineups", true) && !it.contains("google.com", true) }
-        }.firstOrNull()
-    }.getOrNull()
-    if (!likelyUrl.isNullOrBlank()) {
-        runCatching { parseLikelyLineups(likelyUrl) }.getOrNull()
-            ?.takeIf { it.size == sides.size }?.let { return it }
+        runCatching {
+            val search = Jsoup.connect("https://www.google.com/search?q=" + enc(query) + "&num=8")
+                .userAgent(userAgent).timeout(10000).get()
+            search.select("a[href]").mapNotNull { anchor ->
+                val raw = anchor.absUrl("href")
+                val resolved = if (raw.contains("google.com/url", true)) Uri.parse(raw).getQueryParameter("q") ?: raw else raw
+                resolved.takeIf { it.contains("likelylineups.com/", true) && it.contains("lineups", true) && !it.contains("google.com", true) }
+            }.forEach { if (it !in this) add(it) }
+        }
+    }
+    for (url in directUrls) {
+        val parsed = runCatching { parseLikelyPage(url) }.getOrDefault(emptyList())
+        if (parsed.size == sides.size && parsed.all { it.starters.size >= 8 }) return parsed
     }
 
-    // Fallback for competitions not covered by Likely Lineups.
+    // Reliable textual fallback: Sports Mole's team-news articles use semicolon-separated XIs.
     return try {
         val query = "\"$fixture\" predicted XI site:sportsmole.co.uk/football"
         val search = Jsoup.connect("https://www.google.com/search?q=" + enc(query) + "&num=8")
-            .userAgent(userAgent).timeout(9000).get()
+            .userAgent(userAgent).timeout(10000).get()
         val articleUrl = search.select("a[href]").mapNotNull { anchor ->
             val raw = anchor.absUrl("href")
             val resolved = if (raw.contains("google.com/url", true)) Uri.parse(raw).getQueryParameter("q") ?: raw else raw
-            resolved.takeIf { it.contains("sportsmole.co.uk/football/", true) &&
-                it.contains("team-news", true) && !it.contains("google.com", true) }
+            resolved.takeIf { it.contains("sportsmole.co.uk/football/", true) && it.contains("team-news", true) && !it.contains("google.com", true) }
         }.firstOrNull() ?: return emptyList()
-        val text = Jsoup.connect(articleUrl).userAgent(userAgent).timeout(10000)
-            .get().body().text().replace(Regex("\\s+"), " ")
-        val xIs = Regex("(?i)Sports Mole\\s*['’]s\\s*predicted XI:\\s*(.{15,250}?)(?=\\s+[A-Z][A-Z .'-]{3,30}\\s+(?:predicted XI|team news)|\\s+Our prediction|\\s+Our verdict|$)")
-            .findAll(text)
-            .map { it.groupValues[1].trim().trimEnd('.', ';').split(Regex("\\s*;\\s*")).map(String::trim).filter { n -> n.length in 2..60 } }
-            .filter { it.size >= 8 }.toList()
+        val articleText = Jsoup.connect(articleUrl).userAgent(userAgent).timeout(12000).get().body().text().replace(Regex("\\s+"), " ")
+        val labels = Regex("(?i)Sports Mole\\s*['’]s\\s*predicted XI:")
+        val matches = labels.findAll(articleText).toList()
+        val xIs = matches.mapIndexedNotNull { index, match ->
+            val end = matches.getOrNull(index + 1)?.range?.first ?: minOf(articleText.length, match.range.last + 350)
+            articleText.substring(match.range.last + 1, end)
+                .substringBefore("Our prediction")
+                .substringBefore("Our verdict")
+                .trim().trimStart(':', ' ')
+                .split(Regex("\\s*;\\s*"))
+                .map(String::trim)
+                .filter { it.length in 2..60 }
+                .takeIf { it.size >= 8 }
+        }
         if (xIs.size >= 2 && sides.size >= 2) sides.take(2).mapIndexed { index, side ->
             LineupTeam(side, null, xIs[index].take(11), emptyList(), "PREDICTED", "Sports Mole")
         } else emptyList()
