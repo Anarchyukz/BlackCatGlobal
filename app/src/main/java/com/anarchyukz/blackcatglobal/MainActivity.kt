@@ -1707,8 +1707,8 @@ private fun fetchPredictedLineups(fixture: String, sides: List<String>): List<Li
                 val likely = section.indexOf("Likely XI", ignoreCase = true)
                 if (likely < 0) continue
                 val xiText = section.substring(likely + "Likely XI".length)
-                    .substringBefore("team news", ignoreCase = true)
-                    .substringBefore("projected from", ignoreCase = true)
+                    .replace(Regex("(?i)team news.*$"), "")
+                    .replace(Regex("(?i)projected from.*$"), "")
                 val players = Regex("(?i)\\d+\\.\\s+\\d+\\s+(.+?)\\s+[GDMF](?=\\s+\\d+\\.\\s+\\d+\\s+|\\s*$)")
                     .findAll(xiText).map { it.groupValues[1].trim().trimEnd(',', '.') }
                     .filter { it.length in 2..60 }.toList()
