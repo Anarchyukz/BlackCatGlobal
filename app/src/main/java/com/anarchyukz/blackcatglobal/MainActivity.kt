@@ -727,7 +727,7 @@ private fun BlackCatApp() {
                         } else {
                             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                                 channels.take(6).forEachIndexed { index, channel -> ChannelRow(channel, index + 1) }
-                                if (channels.size > 6) androidx.compose.material3.TextButton(onClick = { selectedTab = 1 }) {
+                                if (channels.size > 6) androidx.compose.material3.TextButton(onClick = { selectedTab = 0 }) {
                                     Text("See all ${channels.size} channels", color = Color(0xFFFF8B93))
                                 }
                             }
