@@ -684,7 +684,7 @@ private fun BlackCatApp() {
                             Image(
                                 painter = painterResource(id = R.drawable.banner),
                                 contentDescription = "Local takeaway discounts",
-                                modifier = Modifier.fillMaxWidth().height(88.dp),
+                                modifier = Modifier.fillMaxWidth().height(132.dp),
                                 contentScale = ContentScale.Crop
                             )
                         }
@@ -703,7 +703,7 @@ private fun BlackCatApp() {
                                 ).padding(20.dp),
                                 verticalArrangement = Arrangement.spacedBy(12.dp)
                             ) {
-                                Text("NEXT FIXTURE", color = Color(0xFFFFA2A8), fontSize = 11.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 2.sp)
+                                Text("UP NEXT", color = Color(0xFFFFA2A8), fontSize = 11.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 2.sp)
                                 // The home screen uses the dated fixture schedule, not the TV-guide
                                 // page's first Sunderland match link (which can point to a later game).
                                 FixtureMatchup(
@@ -1208,14 +1208,47 @@ private fun InfoPanel(title: String, body: String) {
 
 @Composable
 private fun ChannelRow(channel: String, number: Int) {
-    Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp), colors = CardDefaults.cardColors(containerColor = Panel)) {
-        Row(Modifier.fillMaxWidth().padding(horizontal = 13.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            Box(Modifier.background(Color(0xFF352027), RoundedCornerShape(9.dp)).padding(horizontal = 9.dp, vertical = 7.dp)) {
-                Text(number.toString().padStart(2, '0'), color = Color(0xFFFF8B93), fontSize = 11.sp, fontWeight = FontWeight.ExtraBold)
+    val lower = channel.lowercase()
+    val brand = when {
+        "sky" in lower -> "sky\\nsports"
+        "tnt" in lower -> "TNT\\nSPORTS"
+        "bein" in lower -> "beIN\\nSPORTS"
+        "espn" in lower -> "ESPN"
+        "bbc" in lower -> "BBC"
+        "itv" in lower -> "itv"
+        "supersport" in lower -> "SUPER\\nSPORT"
+        "dazn" in lower -> "DAZN"
+        "canal" in lower -> "CANAL+"
+        "optus" in lower -> "optus\\nsport"
+        "peacock" in lower -> "peacock"
+        "fox" in lower -> "FOX\\nSPORTS"
+        "sportsnet" in lower -> "SN"
+        else -> channel.split(" ").take(2).joinToString(" ") { it.take(5) }.uppercase()
+    }
+    val brandColor = when {
+        "sky" in lower -> Color(0xFF1265B5)
+        "tnt" in lower -> Color(0xFFB719C8)
+        "bein" in lower -> Color(0xFF6B3CA0)
+        "espn" in lower || "fox" in lower -> Color(0xFFB8202F)
+        "bbc" in lower -> Color(0xFF30343B)
+        "dazn" in lower -> Color.Black
+        "canal" in lower -> Color(0xFF263F9D)
+        else -> Color(0xFF18354C)
+    }
+    Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF111820))) {
+        Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+            Box(Modifier.size(width = 92.dp, height = 42.dp).background(brandColor, RoundedCornerShape(5.dp)).padding(horizontal = 4.dp),
+                contentAlignment = Alignment.Center) {
+                Text(brand, color = Color.White, fontSize = if (brand.length > 8) 10.sp else 13.sp,
+                    lineHeight = 13.sp, fontWeight = FontWeight.Black, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
             }
-            Text(channel, Modifier.weight(1f), color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
-            Text("FOUND", color = Muted, fontSize = 9.sp, letterSpacing = 0.8.sp)
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                Text(channel, color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                Text("WORLDWIDE LISTING  •  $number", color = Muted, fontSize = 10.sp)
+            }
+            Icon(Icons.Filled.OpenInNew, contentDescription = "Channel listing", tint = Color(0xFF91A8C8), modifier = Modifier.size(19.dp))
         }
     }
 }
