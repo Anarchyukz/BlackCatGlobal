@@ -249,9 +249,9 @@ private fun parseFeedItem(
 private fun extractRssHtmlImage(html: String): String? {
     if (html.isBlank()) return null
     val patterns = listOf(
-        Regex("""(?is)<img\\b[^>]*?\\b(?:src|data-src|data-original|data-lazy-src)\\s*=\\s*["']([^"']+)["']"""),
-        Regex("""(?is)<source\\b[^>]*?\\bsrcset\\s*=\\s*["']([^"']+)["']"""),
-        Regex("""(?is)<meta\\b[^>]*?\\b(?:property|name)\\s*=\\s*["'](?:og:image|twitter:image)["'][^>]*?\\bcontent\\s*=\\s*["']([^"']+)["']""")
+        Regex("""(?is)<img\b[^>]*?\b(?:src|data-src|data-original|data-lazy-src)\s*=\s*["']([^"']+)["']"""),
+        Regex("""(?is)<source\b[^>]*?\bsrcset\s*=\s*["']([^"']+)["']"""),
+        Regex("""(?is)<meta\b[^>]*?\b(?:property|name)\s*=\s*["'](?:og:image|twitter:image)["'][^>]*?\bcontent\s*=\s*["']([^"']+)["']""")
     )
     for (pattern in patterns) {
         val match = pattern.find(html) ?: continue
