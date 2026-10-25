@@ -32,7 +32,27 @@ private val sunderlandRssFeeds = listOf(
     ),
     NewsRssFeed("ChronicleLive · Sunderland", "https://www.chroniclelive.co.uk/all-about/sunderland?service=rss"),
     NewsRssFeed("Sunderland Echo", "https://www.sunderlandecho.com/rss"),
-    NewsRssFeed("The Northern Echo", "https://www.thenorthernecho.co.uk/news/rss/")
+    NewsRssFeed("The Northern Echo", "https://www.thenorthernecho.co.uk/news/rss/"),
+    // Google News RSS searches fill the local-news section when publisher RSS endpoints
+    // are blocked, moved, or return HTML instead of XML. These remain RSS-only sources.
+    NewsRssFeed(
+        "Local News · Sunderland",
+        "https://news.google.com/rss/search?q=" +
+            URLEncoder.encode("Sunderland local news -football -Sunderland AFC", StandardCharsets.UTF_8.name()) +
+            "&hl=en-GB&gl=GB&ceid=GB:en"
+    ),
+    NewsRssFeed(
+        "Local News · Tyne and Wear",
+        "https://news.google.com/rss/search?q=" +
+            URLEncoder.encode("Tyne and Wear local news Newcastle South Shields Gateshead", StandardCharsets.UTF_8.name()) +
+            "&hl=en-GB&gl=GB&ceid=GB:en"
+    ),
+    NewsRssFeed(
+        "Local News · County Durham",
+        "https://news.google.com/rss/search?q=" +
+            URLEncoder.encode("County Durham local news", StandardCharsets.UTF_8.name()) +
+            "&hl=en-GB&gl=GB&ceid=GB:en"
+    )
 )
 
 /**
