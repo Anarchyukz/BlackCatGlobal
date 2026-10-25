@@ -351,10 +351,10 @@ private fun BlackCatApp() {
             val lineupJob = async(Dispatchers.IO) {
                 runCatching { fetchLineups(target) }.getOrDefault(emptyList())
             }
-            worldwideSearchResults = channelJob.await()
-            worldwideSearchLoading = false
             lineupTeams = lineupJob.await()
             lineupsLoading = false
+            worldwideSearchResults = channelJob.await()
+            worldwideSearchLoading = false
         }
         while (true) {
             kotlinx.coroutines.delay(5 * 60_000L)
