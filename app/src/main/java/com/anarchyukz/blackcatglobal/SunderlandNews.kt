@@ -200,6 +200,10 @@ private fun parseFeedItem(
             "title" -> title = readXmlText(parser).trim()
             "description", "summary", "content", "encoded" -> {
                 val value = readXmlText(parser).trim()
+                // Some publisher RSS feeds put the article thumbnail only inside the
+                // description/content HTML rather than a Media RSS tag. Extract that
+                // URL from the feed payload itself; do not fetch or scrape article pages.
+                if (image == null) image = extractRssHtmlImage(value)
                 if (summary.isBlank() && value.isNotBlank()) summary = value
             }
             "pubdate", "published", "updated", "date" -> {
@@ -235,6 +239,31 @@ private fun parseFeedItem(
         url = cleanUrl,
         imageUrl = image?.takeIf { it.startsWith("https://", true) || it.startsWith("http://", true) }
     )
+}
+
+/**
+ * Extract the first plausible article image from HTML embedded inside an RSS item.
+ * Handles regular and lazy-loaded image attributes plus Open Graph-style image tags.
+ * This reads only the RSS item content and never requests the publisher's webpage.
+ */
+private fun extractRssHtmlImage(html: String): String? {
+    if (html.isBlank()) return null
+    val patterns = listOf(
+        Regex("""(?is)<img\\b[^>]*?\\b(?:src|data-src|data-original|data-lazy-src)\\s*=\\s*["']([^"']+)["']"""),
+        Regex("""(?is)<source\\b[^>]*?\\bsrcset\\s*=\\s*["']([^"']+)["']"""),
+        Regex("""(?is)<meta\\b[^>]*?\\b(?:property|name)\\s*=\\s*["'](?:og:image|twitter:image)["'][^>]*?\\bcontent\\s*=\\s*["']([^"']+)["']""")
+    )
+    for (pattern in patterns) {
+        val match = pattern.find(html) ?: continue
+        val candidate = match.groupValues[1].substringBefore(',').trim().substringBefore(' ')
+        if (candidate.startsWith("https://", true) || candidate.startsWith("http://", true)) {
+            val lower = candidate.lowercase()
+            if (!lower.contains("pixel") && !lower.contains("spacer") && !lower.contains("logo")) {
+                return candidate.replace("&amp;", "&")
+            }
+        }
+    }
+    return null
 }
 
 /** Parse RSS dates as real timestamps; sorting the raw date strings is not chronological. */
