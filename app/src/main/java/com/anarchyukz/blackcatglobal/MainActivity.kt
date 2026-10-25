@@ -246,6 +246,7 @@ private fun BlackCatApp() {
     var lineupTeams by remember { mutableStateOf<List<LineupTeam>>(emptyList()) }
     var lineupsLoading by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
+    var showAllChannels by remember { mutableStateOf(false) }
     var analyticsSnapshotLogged by remember { mutableStateOf(false) }
     var checkingUpdate by remember { mutableStateOf(false) }
     var updateMessage by remember { mutableStateOf<String?>(null) }
@@ -728,9 +729,9 @@ private fun BlackCatApp() {
                             )
                         } else {
                             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                channels.take(6).forEachIndexed { index, channel -> ChannelRow(channel, index + 1) }
-                                if (channels.size > 6) androidx.compose.material3.TextButton(onClick = { selectedTab = 0 }) {
-                                    Text("See all ${channels.size} channels", color = Color(0xFFFF8B93))
+                                channels.take(if (showAllChannels) channels.size else 6).forEachIndexed { index, channel -> ChannelRow(channel, index + 1) }
+                                if (channels.size > 6) androidx.compose.material3.TextButton(onClick = { showAllChannels = !showAllChannels }) {
+                                    Text(if (showAllChannels) "Show fewer channels" else "See all ${channels.size} channels", color = Color(0xFFFF8B93))
                                 }
                             }
                         }
@@ -1069,11 +1070,22 @@ private fun FixtureMatchup(fixture: String) {
                                 }
                             }
                             if (badge == null && teams.length() > 0) {
-                                val first = teams.optJSONObject(0)
-                                val candidate = first?.optString("strBadge").orEmpty().ifBlank { first?.optString("strTeamBadge").orEmpty() }
+                                // Only use a fallback result when its team name actually matches;
+                                // the API can return similarly named clubs ahead of the requested team.
+                                val matching = (0 until teams.length()).mapNotNull { teams.optJSONObject(it) }
+                                    .firstOrNull { item ->
+                                        val name = item.optString("strTeam")
+                                        name.equals(team, true) || name.contains(team, true) || team.contains(name, true)
+                                    }
+                                val candidate = matching?.optString("strBadge").orEmpty()
+                                    .ifBlank { matching?.optString("strTeamBadge").orEmpty() }
                                 badge = candidate.takeIf { it.startsWith("https://", true) || it.startsWith("http://", true) }
                                     ?.replaceFirst("http://", "https://", ignoreCase = true)
                             }
+                        }
+                        // Stable Premier League fallback for Leeds if TheSportsDB has no badge.
+                        if (badge.isNullOrBlank() && team.contains("Leeds", true)) {
+                            badge = "https://resources.premierleague.com/premierleague/badges/50/t399.png"
                         }
                         badge
                     } catch (_: Exception) { null }
