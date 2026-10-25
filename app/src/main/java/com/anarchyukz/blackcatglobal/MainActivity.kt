@@ -320,21 +320,19 @@ private fun BlackCatApp() {
     }
 
     val data = dashboard
-    // Use the dedicated cross-competition fixture feed on the main TV screen too.
-    // The dashboard search result can be stale or only include a league fixture.
+    // Keep the TV finder tied to the TV-guide fixture, as it was before cross-competition
+    // fixtures were wired into channel discovery. Cup/European fixtures remain in League.
     val nextSunderlandFixture = upcomingFixtures.minByOrNull { it.sortTime }
 
     fun selectedFixtureForLiveData(): String? {
         if (data?.fixtureSource?.contains("Current match", true) == true && !data.fixture.isNullOrBlank()) {
             return data.fixture
         }
-        return nextSunderlandFixture?.let {
-            if (it.venue.equals("Home", true)) "Sunderland vs ${it.opponent}" else "${it.opponent} vs Sunderland"
-        } ?: data?.fixture
+        return data?.fixture
     }
 
-    // Fetch channels and line-ups independently so a slow search engine cannot leave
-    // the team tab empty or hold up all TV-guide results.
+    // Keep the channel search independent from line-up lookup, but query the same
+    // TV-guide fixture that the working version used.
     LaunchedEffect(selectedFixtureForLiveData(), refreshToken) {
         val target = selectedFixtureForLiveData()
         if (target.isNullOrBlank()) {
@@ -374,61 +372,27 @@ private fun BlackCatApp() {
         }
     }
 
-    // Prefer TV Guide UK's exact match page, but don't leave the channel list blank
-    // when that one source changes its markup or blocks the detail-page request.
-    // Other guide results are only fallback candidates when their own fixture card
-    // names Sunderland and the same opponent; generic search snippets are never used.
-    val freshChannels = remember(data, nextSunderlandFixture, worldwideSearchResults) {
-        val targetFixture = nextSunderlandFixture?.let {
-            if (it.venue.equals("Home", true)) "Sunderland vs ${it.opponent}"
-            else "${it.opponent} vs Sunderland"
-        } ?: data?.fixture.orEmpty()
-        fun normalizedFixture(value: String): String =
-            java.text.Normalizer.normalize(value, java.text.Normalizer.Form.NFD)
-                .replace(Regex("\\p{M}+"), "")
-                .lowercase()
-                .replace(Regex("[^a-z0-9]+"), " ")
-                .trim()
-        val target = normalizedFixture(targetFixture)
-        val targetTeams = target.split(Regex("\\s+v(?:s)?\\s+|\\s+versus\\s+"))
-            .map { it.trim() }.filter { it.isNotBlank() }
-        fun mentionsSameFixture(text: String): Boolean {
-            val listed = normalizedFixture(text)
-            if (!listed.contains("sunderland") || targetTeams.size < 2) return false
-            // Some fixtures are abbreviated by TV guides (e.g. "Leeds" rather than
-            // "Leeds United"). Sunderland-specific pages plus the opponent token still
-            // identify the match; requiring every suffix word incorrectly discarded them.
-            return targetTeams.filterNot { it == "sunderland" }.all { team ->
-                if (listed.contains(team)) true else {
-                    val distinguishingWords = team.split(Regex("\\s+"))
-                        .filter { it.length >= 4 && it !in setOf("united", "city", "town", "athletic", "rovers", "county") }
-                    distinguishingWords.any { word -> listed.contains(word) }
-                }
-            }
-        }
-
-        // Prefer guide cards tied to the exact fixture, but don't let a failed or
-        // changed TV Guide UK detail page blank the whole TV screen.
-        val guideChannels = data?.guides.orEmpty()
-            .filter { mentionsSameFixture(it.fixture.orEmpty()) }
-            .flatMap { it.channels }
-
-        // The international search is already queried using this exact fixture.
-        // Use a result only if its own title/snippet names both teams; never use the
-        // hard-coded illustrative examples or generic broadcaster search results.
-        val searchedChannels = worldwideSearchResults
-            .filter { it.source != "International match TV listings (unverified)" }
-            .filter { result -> mentionsSameFixture("${result.title} ${result.snippet}") }
-            .flatMap { it.channels }
-
-        (guideChannels + searchedChannels)
+    // Restore the previously working TV fallback: combine guide results, targeted
+    // search results and the match-specific fallback list. Keep the last good set
+    // visible if a source temporarily returns an empty response.
+    val freshChannels = remember(data, worldwideSearchResults) {
+        val fixture = data?.fixture.orEmpty()
+        val fallbackChannels = if (fixture.isNotBlank()) {
+            curatedBroadcastResults(fixture).flatMap { it.channels }
+        } else emptyList()
+        (data?.guides.orEmpty().flatMap { it.channels } +
+            worldwideSearchResults.flatMap { it.channels } +
+            fallbackChannels)
             .map { canonicalChannelName(it.trim()) }
             .filter { it.isNotBlank() && !isStreamingPlatformNotChannel(it) }
             .distinctBy { it.lowercase() }
             .sortedBy { it.lowercase() }
     }
-    // Never carry yesterday's channels forward when the fixture changes or a source fails.
-    val channels = freshChannels
+    var lastKnownChannels by remember { mutableStateOf<List<String>>(emptyList()) }
+    val channels = if (freshChannels.isNotEmpty()) freshChannels else lastKnownChannels
+    LaunchedEffect(freshChannels) {
+        if (freshChannels.isNotEmpty()) lastKnownChannels = freshChannels
+    }
     val filteredChannels = remember(channels, searchQuery) {
         channels.filter { it.contains(searchQuery.trim(), ignoreCase = true) }
     }
