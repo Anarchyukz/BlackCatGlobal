@@ -1727,7 +1727,7 @@ private fun fetchPredictedLineups(fixture: String, sides: List<String>): List<Li
             // The page text can flatten list items differently across mobile/desktop HTML.
             // First extract numbered shirt-number entries, then fall back to numbered names
             // without relying on the position abbreviation being present in the text.
-            val players = Regex("(?i)(?:^|\\\\s)\\\\d+\\\\.\\\\s+\\\\d+\\\\s+(.+?)\\\\s+[GDMF](?=\\\\s+\\\\d+\\\\.\\\\s+\\\\d+\\\\s+|\\\\s*$)")
+            val players = Regex("(?i)(?:^|\\s)\\d+\\.\\s+\\d+\\s+(.+?)\\s+[GDMF](?=\\s+\\d+\\.\\s+\\d+\\s+|\\s*$)")
                 .findAll(listText)
                 .map { it.groupValues[1].trim().trimEnd(',', '.') }
                 .filter { it.length in 2..60 && !it.contains("Projected from", true) }
