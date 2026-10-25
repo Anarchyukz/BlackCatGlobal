@@ -688,7 +688,9 @@ private fun BlackCatApp() {
                                                     it.url.contains("rokerreport.sbnation.com", true)) 0 else 1
                                             }
                                     )
-                                "Local News" -> newsArticles.filter { !isFootballStreamSpam(it) && isLocalPublisher(it) && !isSunderlandFootball(it) }
+                                "Local News" -> // Local coverage can include Sunderland AFC and other local football stories too.
+                                // Keep local-publisher filtering and the illegal-stream spam filter, but do not exclude football articles.
+                                newsArticles.filter { !isFootballStreamSpam(it) && isLocalPublisher(it) }
                                     .sortedByDescending { it.publishedTimestamp }
                                 else -> newsArticles.filter { !isFootballStreamSpam(it) && isSunderlandFootball(it) }
                                     .sortedByDescending { it.publishedTimestamp }
