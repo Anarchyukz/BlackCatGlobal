@@ -468,12 +468,15 @@ private fun BlackCatApp() {
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween) {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        Box(Modifier.background(CatRed, RoundedCornerShape(12.dp)).padding(horizontal = 10.dp, vertical = 8.dp)) {
-                            Text("BC", color = Color.White, fontWeight = FontWeight.Black, fontSize = 18.sp)
+                        Box(
+                            Modifier.size(46.dp).background(Color(0xFF301B22), RoundedCornerShape(14.dp)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text("\uD83D\uDC08\u200D\u2B1B", fontSize = 27.sp, maxLines = 1)
                         }
-                        Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
-                            Text("BLACK CAT GLOBAL", color = Color.White, fontWeight = FontWeight.Black, fontSize = 17.sp, letterSpacing = 0.7.sp, maxLines = 1)
-                            Text("SUNDERLAND AFC", color = Muted, fontSize = 9.sp, letterSpacing = 1.5.sp)
+                        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                            Text("BlackCat Global", color = Color.White, fontWeight = FontWeight.Black, fontSize = 19.sp, letterSpacing = 0.1.sp, maxLines = 1)
+                            Text("SUNDERLAND AFC", color = Color(0xFFFFA2A8), fontSize = 9.sp, letterSpacing = 1.8.sp, fontWeight = FontWeight.Bold)
                         }
                     }
                     androidx.compose.material3.IconButton(onClick = { refreshToken++; newsRefreshToken++; leagueRefreshToken++ }) {
