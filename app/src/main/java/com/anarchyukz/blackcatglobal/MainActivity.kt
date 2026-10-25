@@ -686,14 +686,22 @@ private fun BlackCatApp() {
                                 verticalArrangement = Arrangement.spacedBy(12.dp)
                             ) {
                                 Text("NEXT FIXTURE", color = Color(0xFFFFA2A8), fontSize = 11.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 2.sp)
+                                // The home screen uses the dated fixture schedule, not the TV-guide
+                                // page's first Sunderland match link (which can point to a later game).
                                 FixtureMatchup(
-                                    fixture = data?.fixture
-                                        ?: if (loading) "Finding Sunderland's next match…" else "Fixture unavailable"
+                                    fixture = nextSunderlandFixture?.let { scheduled ->
+                                        if (scheduled.venue.equals("Home", true)) {
+                                            "Sunderland vs ${scheduled.opponent}"
+                                        } else {
+                                            "${scheduled.opponent} vs Sunderland"
+                                        }
+                                    } ?: if (loading) "Finding Sunderland's next match…" else "Fixture unavailable"
                                 )
                                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                     Icon(Icons.Filled.SportsSoccer, contentDescription = null, tint = CatRed, modifier = Modifier.size(19.dp))
                                     Text(
-                                        data?.kickoff ?: "Kick-off time will appear when confirmed",
+                                        nextSunderlandFixture?.date ?: data?.kickoff
+                                            ?: "Kick-off time will appear when confirmed",
                                         color = Muted, fontSize = 13.sp, lineHeight = 18.sp
                                     )
                                 }
