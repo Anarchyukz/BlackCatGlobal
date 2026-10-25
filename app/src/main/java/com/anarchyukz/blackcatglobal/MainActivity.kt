@@ -673,6 +673,38 @@ private fun BlackCatApp() {
                         }
                     }
                     0 -> {
+                        // Compact local takeaway promotion: deliberately kept short so it
+                        // sits above the match centre without dominating the TV screen.
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(16.dp),
+                            colors = CardDefaults.cardColors(containerColor = Color(0xFF174A78))
+                        ) {
+                            Row(
+                                Modifier.fillMaxWidth()
+                                    .background(
+                                        androidx.compose.ui.graphics.Brush.horizontalGradient(
+                                            listOf(Color(0xFF1765A6), Color(0xFF173B5C), Color(0xFF25242B))
+                                        )
+                                    )
+                                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                Box(
+                                    Modifier.size(42.dp)
+                                        .background(Color(0xFFD91F35), RoundedCornerShape(10.dp)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(Icons.Filled.SportsSoccer, contentDescription = null, tint = Color.White, modifier = Modifier.size(25.dp))
+                                }
+                                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                    Text("LOCAL TAKEAWAY", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 1.1.sp)
+                                    Text("DISCOUNTS", color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Black, lineHeight = 22.sp)
+                                }
+                                Text("LOCAL", color = Color(0xFFFFD9DE), fontSize = 9.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 1.sp)
+                            }
+                        }
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             Box(Modifier.size(8.dp).background(CatRed, RoundedCornerShape(50)))
                             Text(if (loading) "UPDATING MATCH CENTRE" else "MATCH CENTRE", color = CatRed, fontWeight = FontWeight.ExtraBold, fontSize = 11.sp, letterSpacing = 1.8.sp)
