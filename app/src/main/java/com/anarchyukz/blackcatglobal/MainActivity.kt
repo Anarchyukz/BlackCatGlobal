@@ -733,8 +733,10 @@ private fun BlackCatApp() {
                         }
                         SectionHeader("BROADCAST SNAPSHOT", "Names found in public listings and web results")
                         if (channels.isEmpty()) {
-                            InfoPanel(if (loading) "Checking worldwide listings" else "No channels found yet",
-                                "Listings can vary by country and source. Use the refresh icon above to check again.")
+                            InfoPanel(
+                                if (loading || worldwideSearchLoading) "Checking worldwide listings" else "No verified channel matches found yet",
+                                "Checking the selected fixture across regional listings. Use the single refresh icon at the top to retry; streaming-only services are kept out of the TV-channel list."
+                            )
                         } else {
                             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                                 channels.take(6).forEachIndexed { index, channel -> ChannelRow(channel, index + 1) }
