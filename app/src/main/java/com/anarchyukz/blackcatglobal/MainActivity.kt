@@ -310,6 +310,7 @@ private fun BlackCatApp() {
     var dashboard by remember { mutableStateOf<DashboardData?>(null) }
     var refreshToken by remember { mutableIntStateOf(0) }
     var selectedTab by remember { mutableIntStateOf(5) }
+    var selectedPodcast by remember { mutableIntStateOf(0) }
     var newsLoading by remember { mutableStateOf(true) }
     var newsArticles by remember { mutableStateOf<List<SunderlandNewsArticle>>(emptyList()) }
     var newsCategory by remember { mutableStateOf("Sunderland AFC") }
@@ -986,7 +987,6 @@ private fun BlackCatApp() {
                     }
                     2 -> {
                         SectionHeader("SUNDERLAND PODCASTS", "The latest voices, reactions and debate from Wearside")
-                        var selectedPodcast by remember { mutableIntStateOf(0) }
                         val podcasts = listOf(
                             Triple("Wise Men Say", "4.5 / 5  ·  2–3 times weekly", "The longest-running Sunderland AFC podcast, with a strong community feel."),
                             Triple("Haway The Podcast", "4.8 / 5  ·  Daily (short/medium)", "Instant post-match reactions and daily updates."),
@@ -1017,15 +1017,15 @@ private fun BlackCatApp() {
                                         Text(podcast.third, color = Muted, fontSize = 12.sp, lineHeight = 17.sp)
                                         if (index == 0) Text("FEATURED PODCAST", color = Color(0xFFFFA2A8), fontSize = 9.sp, fontWeight = FontWeight.Black, letterSpacing = 1.sp)
                                     }
-                                    Icon(Icons.Filled.OpenInNew, contentDescription = "Select ${podcast.first}", tint = Color(0xFFFFA2A8))
+                                    Icon(Icons.Filled.Headphones, contentDescription = if (selectedPodcast == index) "Selected podcast" else "Select ${podcast.first}", tint = Color(0xFFFFA2A8))
                                 }
                             }
                         }
                         val context = LocalContext.current
                         val scope = rememberCoroutineScope()
-                        var episodes by remember(selectedPodcast) { mutableStateOf<List<PodcastEpisode>>(emptyList()) }
-                        var feedLoading by remember(selectedPodcast) { mutableStateOf(true) }
-                        var feedError by remember(selectedPodcast) { mutableStateOf(false) }
+                        var episodes by remember { mutableStateOf<List<PodcastEpisode>>(emptyList()) }
+                        var feedLoading by remember { mutableStateOf(true) }
+                        var feedError by remember { mutableStateOf(false) }
                         var activeEpisode by remember { mutableStateOf<PodcastEpisode?>(null) }
                         val player = remember(context) { ExoPlayer.Builder(context).build() }
                         var isPlaying by remember { mutableStateOf(false) }
