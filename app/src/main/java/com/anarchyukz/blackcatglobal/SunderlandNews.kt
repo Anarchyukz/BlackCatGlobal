@@ -6,6 +6,10 @@ import java.net.HttpURLConnection
 import java.net.URL
 import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
+import java.text.ParsePosition
+import java.text.SimpleDateFormat
+import java.util.Locale
+import java.util.TimeZone
 
 internal data class SunderlandNewsArticle(
     val title: String,
@@ -14,7 +18,9 @@ internal data class SunderlandNewsArticle(
     val published: String,
     val url: String,
     val imageUrl: String?
-)
+) {
+    val publishedTimestamp: Long get() = parsePublishedTimestamp(published)
+}
 
 private data class NewsRssFeed(val source: String, val url: String)
 
@@ -101,7 +107,7 @@ internal fun loadSunderlandNews(): List<SunderlandNewsArticle> {
         tasks.flatMap { task ->
             runCatching { task.get(14, java.util.concurrent.TimeUnit.SECONDS) }
                 .getOrDefault(emptyList())
-        }.distinctBy { it.url }.sortedByDescending { it.published }.take(80)
+        }.distinctBy { it.url }.sortedByDescending { it.publishedTimestamp }.take(80)
     } finally {
         executor.shutdownNow()
     }
@@ -220,6 +226,32 @@ private fun parseFeedItem(
         url = cleanUrl,
         imageUrl = image?.takeIf { it.startsWith("https://", true) || it.startsWith("http://", true) }
     )
+}
+
+/** Parse RSS dates as real timestamps; sorting the raw date strings is not chronological. */
+private fun parsePublishedTimestamp(value: String): Long {
+    val date = value.trim()
+    if (date.isBlank()) return 0L
+    val patterns = listOf(
+        "EEE, dd MMM yyyy HH:mm:ss zzz",
+        "EEE, dd MMM yyyy HH:mm:ss Z",
+        "EEE, dd MMM yyyy HH:mm zzz",
+        "yyyy-MM-dd'T'HH:mm:ss.SSSXXX",
+        "yyyy-MM-dd'T'HH:mm:ssXXX",
+        "yyyy-MM-dd'T'HH:mm:ss'Z'",
+        "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'",
+        "yyyy-MM-dd"
+    )
+    for (pattern in patterns) {
+        val formatter = SimpleDateFormat(pattern, Locale.US).apply {
+            isLenient = false
+            timeZone = TimeZone.getTimeZone("UTC")
+        }
+        val position = ParsePosition(0)
+        val parsed = formatter.parse(date, position)
+        if (parsed != null && position.index == date.length) return parsed.time
+    }
+    return 0L
 }
 
 /** Reads text/CDATA inside an XML element without parsing it as HTML. */
