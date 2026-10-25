@@ -7,6 +7,8 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.compose.BackHandler
 import com.google.firebase.analytics.FirebaseAnalytics
+import coil.ImageLoader
+import coil.decode.SvgDecoder
 import coil.compose.AsyncImage
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
@@ -1255,6 +1257,10 @@ private fun InfoPanel(title: String, body: String) {
 
 @Composable
 private fun ChannelRow(channel: String, number: Int) {
+    val context = LocalContext.current
+    val imageLoader = remember(context) {
+        ImageLoader.Builder(context).components { add(SvgDecoder.Factory()) }.build()
+    }
     val lower = channel.lowercase()
     val brand = when {
         "sky" in lower -> "sky\\nsports"
@@ -1329,18 +1335,17 @@ private fun ChannelRow(channel: String, number: Int) {
         colors = CardDefaults.cardColors(containerColor = Color(0xFF111820))) {
         Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+            var logoFailed by remember(logoUrl) { mutableStateOf(false) }
             Box(Modifier.size(width = 92.dp, height = 48.dp).background(Color.White, RoundedCornerShape(5.dp)).padding(4.dp),
                 contentAlignment = Alignment.Center) {
-                if (logoUrl != null) {
+                if (logoUrl != null && !logoFailed) {
                     AsyncImage(
                         model = logoUrl,
+                        imageLoader = imageLoader,
                         contentDescription = "$channel logo",
                         modifier = Modifier.fillMaxSize(),
                         contentScale = androidx.compose.ui.layout.ContentScale.Fit,
-                        onError = {
-                            // AsyncImage cannot mutate local UI state from this callback here;
-                            // text fallback remains available below for unknown providers.
-                        }
+                        onError = { logoFailed = true }
                     )
                 } else {
                     Box(Modifier.fillMaxSize().background(brandColor, RoundedCornerShape(4.dp)), contentAlignment = Alignment.Center) {
