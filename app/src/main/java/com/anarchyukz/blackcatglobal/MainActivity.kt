@@ -7,6 +7,9 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.compose.BackHandler
 import com.google.firebase.analytics.FirebaseAnalytics
+import androidx.media3.common.MediaItem
+import androidx.media3.common.Player
+import androidx.media3.exoplayer.ExoPlayer
 import coil.ImageLoader
 import coil.decode.SvgDecoder
 import coil.compose.AsyncImage
@@ -39,6 +42,7 @@ import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Article
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.OpenInNew
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.SportsSoccer
@@ -53,9 +57,12 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.onDispose
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -123,6 +130,45 @@ private const val AD_CLEANUP_SCRIPT = """
   }
 })();
 """
+
+private fun formatPodcastTime(milliseconds: Long): String {
+    val total = (milliseconds.coerceAtLeast(0L) / 1000L).toInt()
+    return "${total / 60}:${(total % 60).toString().padStart(2, '0')}"
+}
+
+private data class PodcastEpisode(val title: String, val date: String, val audioUrl: String, val duration: String = "")
+
+private data class PodcastFeed(val name: String, val rssUrl: String, val appleId: String? = null)
+
+private val podcastFeeds = listOf(
+    PodcastFeed("Wise Men Say", "https://feeds.acast.com/public/shows/1354251d-765d-4d91-b940-b43f7fac9d73"),
+    PodcastFeed("Haway The Podcast", "https://podcasts.apple.com/gb/podcast/haway-the-podcast-sunderland-afc/id1800684854", "1800684854"),
+    PodcastFeed("WTF Sunderland", "https://feed.podbean.com/whatthefalkpod/feed.xml"),
+    PodcastFeed("The Roar", "https://anchor.fm/s/d3c3478/podcast/rss")
+)
+
+private suspend fun loadPodcastEpisodes(feed: PodcastFeed): List<PodcastEpisode> = withContext(Dispatchers.IO) {
+    runCatching {
+        val rssUrl = if (feed.appleId != null) {
+            // Apple lookup provides the publisher's actual RSS URL; audio still streams directly.
+            val json = Jsoup.connect("https://itunes.apple.com/lookup?id=${feed.appleId}")
+                .ignoreContentType(true).userAgent("BlackCatGlobal/1.0").timeout(12000).execute().body()
+            org.json.JSONObject(json).optJSONArray("results")?.optJSONObject(0)?.optString("feedUrl")
+                ?.takeIf { it.startsWith("http") } ?: feed.rssUrl
+        } else feed.rssUrl
+        val xml = Jsoup.connect(rssUrl).ignoreContentType(true).parser(org.jsoup.parser.Parser.xmlParser())
+            .userAgent("BlackCatGlobal/1.0").timeout(15000).get()
+        xml.select("item").mapNotNull { item ->
+            val enclosure = item.selectFirst("enclosure[url]")?.attr("url")
+                ?: item.selectFirst("media|content[url]")?.attr("url")
+                ?: return@mapNotNull null
+            val title = item.selectFirst("title")?.text()?.trim().orEmpty().ifBlank { "Podcast episode" }
+            val date = item.selectFirst("pubDate")?.text()?.trim().orEmpty()
+            val duration = item.selectFirst("itunes|duration")?.text()?.trim().orEmpty()
+            PodcastEpisode(title, date, enclosure, duration)
+        }.take(30)
+    }.getOrDefault(emptyList())
+}
 
 private val CatRed = Color(0xFFE53945)
 private val DeepBackground = Color(0xFF101114)
@@ -976,31 +1022,99 @@ private fun BlackCatApp() {
                                 }
                             }
                         }
-                        Text("NOW LISTENING · ${podcasts[selectedPodcast].first}", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.ExtraBold)
-                        Text("Use the embedded podcast player below to play the latest episodes. Playback depends on the publisher's player and connection.", color = Muted, fontSize = 11.sp, lineHeight = 16.sp)
-                        Card(Modifier.fillMaxWidth().height(440.dp), shape = RoundedCornerShape(14.dp),
-                            colors = CardDefaults.cardColors(containerColor = Color.White)) {
-                            AndroidView(
-                                modifier = Modifier.fillMaxSize(),
-                                factory = { viewContext ->
-                                    WebView(viewContext).apply {
-                                        settings.javaScriptEnabled = true
-                                        settings.domStorageEnabled = true
-                                        settings.mediaPlaybackRequiresUserGesture = true
-                                        webViewClient = WebViewClient()
-                                        loadUrl(podcastUrls[selectedPodcast])
+                        val context = LocalContext.current
+                        val scope = rememberCoroutineScope()
+                        var episodes by remember(selectedPodcast) { mutableStateOf<List<PodcastEpisode>>(emptyList()) }
+                        var feedLoading by remember(selectedPodcast) { mutableStateOf(true) }
+                        var feedError by remember(selectedPodcast) { mutableStateOf(false) }
+                        var activeEpisode by remember { mutableStateOf<PodcastEpisode?>(null) }
+                        val player = remember(context) { ExoPlayer.Builder(context).build() }
+                        var isPlaying by remember { mutableStateOf(false) }
+                        var playbackPosition by remember { mutableStateOf(0L) }
+                        var playbackDuration by remember { mutableStateOf(0L) }
+                        DisposableEffect(player) {
+                            val listener = object : Player.Listener {
+                                override fun onIsPlayingChanged(playing: Boolean) { isPlaying = playing }
+                                override fun onPlaybackStateChanged(state: Int) {
+                                    playbackPosition = player.currentPosition.coerceAtLeast(0L)
+                                    playbackDuration = player.duration.takeIf { it > 0 } ?: 0L
+                                }
+                            }
+                            player.addListener(listener)
+                            onDispose { player.removeListener(listener); player.release() }
+                        }
+                        LaunchedEffect(selectedPodcast) {
+                            feedLoading = true
+                            feedError = false
+                            episodes = loadPodcastEpisodes(podcastFeeds[selectedPodcast])
+                            feedError = episodes.isEmpty()
+                            feedLoading = false
+                        }
+                        LaunchedEffect(isPlaying) {
+                            while (isPlaying) {
+                                playbackPosition = player.currentPosition.coerceAtLeast(0L)
+                                playbackDuration = player.duration.takeIf { it > 0 } ?: 0L
+                                kotlinx.coroutines.delay(500)
+                            }
+                        }
+                        Text("NATIVE PLAYER", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.ExtraBold)
+                        Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp),
+                            colors = CardDefaults.cardColors(containerColor = Color(0xFF252027))) {
+                            Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                                Text(activeEpisode?.title ?: "Choose an episode below", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold, maxLines = 3, overflow = TextOverflow.Ellipsis)
+                                Text(podcasts[selectedPodcast].first, color = Color(0xFFFFA2A8), fontSize = 11.sp)
+                                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                    androidx.compose.material3.FilledTonalButton(onClick = {
+                                        if (player.mediaItemCount > 0) {
+                                            if (player.isPlaying) player.pause() else player.play()
+                                        } else if (episodes.isNotEmpty()) {
+                                            activeEpisode = episodes.first()
+                                            player.setMediaItem(MediaItem.fromUri(episodes.first().audioUrl))
+                                            player.prepare()
+                                            player.play()
+                                        }
+                                    }, enabled = player.mediaItemCount > 0 || episodes.isNotEmpty()) {
+                                        Icon(if (isPlaying) Icons.Filled.History else Icons.Filled.SportsSoccer, contentDescription = null)
+                                        Spacer(Modifier.width(6.dp))
+                                        Text(if (isPlaying) "Pause" else "Play")
                                     }
-                                },
-                                update = { webView ->
-                                    val target = podcastUrls[selectedPodcast]
-                                    if (webView.tag != target) {
-                                        webView.tag = target
-                                        webView.loadUrl(target)
+                                    Column(Modifier.weight(1f)) {
+                                        Text("${formatPodcastTime(playbackPosition)} / ${formatPodcastTime(playbackDuration)}", color = Muted, fontSize = 11.sp)
+                                        androidx.compose.material3.Slider(
+                                            value = if (playbackDuration > 0) playbackPosition.toFloat().coerceIn(0f, playbackDuration.toFloat()) else 0f,
+                                            onValueChange = { playbackPosition = it.toLong() },
+                                            onValueChangeFinished = { player.seekTo(playbackPosition) },
+                                            valueRange = 0f..(playbackDuration.coerceAtLeast(1L).toFloat())
+                                        )
                                     }
                                 }
-                            )
+                            }
                         }
-                        Text("Podcast ratings and release schedules are shown as supplied; platforms may display slightly different ratings.", color = Muted, fontSize = 10.sp, lineHeight = 14.sp)
+                        Text("LATEST EPISODES", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.ExtraBold)
+                        when {
+                            feedLoading -> InfoPanel("Loading episodes…", "Fetching the podcast RSS feed.")
+                            feedError -> InfoPanel("Episodes unavailable", "This podcast feed could not be loaded right now. Try again later.")
+                            else -> episodes.forEach { episode ->
+                                Card(Modifier.fillMaxWidth().clickable {
+                                    activeEpisode = episode
+                                    player.setMediaItem(MediaItem.fromUri(episode.audioUrl))
+                                    player.prepare()
+                                    player.play()
+                                }, shape = RoundedCornerShape(12.dp),
+                                    colors = CardDefaults.cardColors(containerColor = if (activeEpisode?.audioUrl == episode.audioUrl) Color(0xFF382027) else Panel)) {
+                                    Row(Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                                        Icon(Icons.Filled.Headphones, contentDescription = "Play episode", tint = Color(0xFFFFA2A8), modifier = Modifier.size(24.dp))
+                                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                                            Text(episode.title, color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold, maxLines = 3, overflow = TextOverflow.Ellipsis)
+                                            Text(listOf(episode.date, episode.duration.takeIf { it.isNotBlank() }?.let { "${it} min" }).filterNotNull().filter { it.isNotBlank() }.joinToString(" · "), color = Muted, fontSize = 10.sp)
+                                        }
+                                        Icon(Icons.Filled.PlayArrow, contentDescription = "Play", tint = Color(0xFFFFA2A8))
+                                    }
+                                }
+                            }
+                        }
+                        Text("Audio streams directly in BlackCat Global. You can leave the tab and use Android's media controls while listening.", color = Muted, fontSize = 10.sp, lineHeight = 14.sp)
                     }
                     3 -> {
                         SectionHeader("RECENT RESULTS", "Latest result information available from public sources")
