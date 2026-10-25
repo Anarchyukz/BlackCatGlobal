@@ -1085,7 +1085,7 @@ private fun FixtureMatchup(fixture: String) {
                         }
                         // Stable Premier League fallback for Leeds if TheSportsDB has no badge.
                         if (badge.isNullOrBlank() && team.contains("Leeds", true)) {
-                            badge = "https://resources.premierleague.com/premierleague/badges/50/t399.png"
+                            badge = "https://assets.football-logos.cc/logos/england/256x256/leeds-united.26dba8f5.png"
                         }
                         badge
                     } catch (_: Exception) { null }
@@ -1153,16 +1153,18 @@ private fun FixtureMatchup(fixture: String) {
 
 @Composable
 private fun TeamCrest(url: String?, teamName: String, modifier: Modifier = Modifier) {
+    var imageFailed by remember(url) { mutableStateOf(false) }
     Box(
         modifier = modifier.background(Color(0xFF30262B), RoundedCornerShape(12.dp)).padding(4.dp),
         contentAlignment = Alignment.Center
     ) {
-        if (!url.isNullOrBlank()) {
+        if (!url.isNullOrBlank() && !imageFailed) {
             AsyncImage(
                 model = url,
                 contentDescription = "$teamName crest",
                 modifier = Modifier.fillMaxSize(),
-                contentScale = ContentScale.Fit
+                contentScale = ContentScale.Fit,
+                onError = { imageFailed = true }
             )
         } else {
             Icon(Icons.Filled.SportsSoccer, contentDescription = "$teamName crest unavailable",
