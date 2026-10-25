@@ -34,6 +34,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.Groups
+import androidx.compose.material.icons.filled.Headphones
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Article
 import androidx.compose.material.icons.filled.Search
@@ -480,7 +481,7 @@ private fun BlackCatApp() {
                         Triple("News", Icons.Filled.Article, 5),
                         Triple("TV", Icons.Filled.SportsSoccer, 0),
                         Triple("League", Icons.Filled.Public, 1),
-                        Triple("Team", Icons.Filled.Groups, 2),
+                        Triple("Podcasts", Icons.Filled.Headphones, 2),
                         Triple("Results", Icons.Filled.History, 3),
                         Triple("Search", Icons.Filled.Search, 4)
                     )
@@ -939,38 +940,67 @@ private fun BlackCatApp() {
                         }
                     }
                     2 -> {
-                        SectionHeader("TEAM & LINE-UPS", "Confirmed XIs when announced · predicted XIs clearly labelled")
-                        if (lineupTeams.isEmpty()) {
-                            InfoPanel(
-                                if (lineupsLoading) "Checking team line-ups…" else "Predicted line-ups not found yet",
-                                if (lineupsLoading) "Checking the fixture-specific team sheet and reputable predicted-line-up sources." else "Confirmed XIs usually appear shortly before kick-off. No predicted XI was found from the sources checked, so no player names have been guessed."
-                            )
-                            if (!data?.squadPlayers.isNullOrEmpty()) {
-                                SectionHeader("REGISTERED PREMIER LEAGUE SQUAD", "Squad numbers · 2026/27")
-                                Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(18.dp), colors = CardDefaults.cardColors(containerColor = Panel)) {
-                                    Text(data!!.squadPlayers.joinToString("\n"), Modifier.fillMaxWidth().padding(16.dp), color = Color.White, fontSize = 14.sp, lineHeight = 23.sp)
-                                }
-                            }
-                        } else lineupTeams.forEach { team ->
-                            Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(containerColor = Panel)) {
-                                Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                                    Text(team.name.uppercase(), color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Black)
-                                    team.formation?.let { Text("Formation  $it", color = Muted, fontSize = 12.sp) }
-                                    Text("${team.status} STARTING XI · ${team.source}", color = CatRed, fontWeight = FontWeight.ExtraBold, fontSize = 11.sp, letterSpacing = 1.1.sp)
-                                    team.starters.forEachIndexed { index, player ->
-                                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                                            Text((index + 1).toString().padStart(2, '0'), color = CatRed, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                                            Text(player, color = Color.White, fontSize = 13.sp)
-                                        }
+                        SectionHeader("SUNDERLAND PODCASTS", "The latest voices, reactions and debate from Wearside")
+                        var selectedPodcast by remember { mutableIntStateOf(0) }
+                        val podcasts = listOf(
+                            Triple("Wise Men Say", "4.5 / 5  ·  2–3 times weekly", "The longest-running Sunderland AFC podcast, with a strong community feel."),
+                            Triple("Haway The Podcast", "4.8 / 5  ·  Daily (short/medium)", "Instant post-match reactions and daily updates."),
+                            Triple("WTF Sunderland", "4.5 / 5  ·  Weekly", "Opposition fan previews and player interviews."),
+                            Triple("The Roar", "4.1 / 5  ·  Weekly", "Sunderland Echo writers discuss the latest news, views and debate.")
+                        )
+                        val podcastUrls = listOf(
+                            "https://shows.acast.com/wisemensay",
+                            "https://app.sport-social.co.uk/podcast/haway-the-podcast",
+                            "https://whatthefalkpod.podbean.com/",
+                            "https://podcasts.apple.com/gb/podcast/the-roar-podcast-sunderland-echo/id1476471017"
+                        )
+                        podcasts.forEachIndexed { index, podcast ->
+                            Card(
+                                Modifier.fillMaxWidth().clickable { selectedPodcast = index },
+                                shape = RoundedCornerShape(14.dp),
+                                colors = CardDefaults.cardColors(containerColor = if (selectedPodcast == index) Color(0xFF382027) else Panel)
+                            ) {
+                                Row(Modifier.fillMaxWidth().padding(14.dp), verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                    Box(Modifier.size(44.dp).background(if (index == 0) CatRed else Color(0xFF30343D), RoundedCornerShape(12.dp)),
+                                        contentAlignment = Alignment.Center) {
+                                        Icon(Icons.Filled.Headphones, contentDescription = null, tint = Color.White, modifier = Modifier.size(24.dp))
                                     }
-                                    if (team.substitutes.isNotEmpty()) {
-                                        androidx.compose.material3.HorizontalDivider(color = Color(0xFF34363C))
-                                        Text("SUBSTITUTES", color = Muted, fontWeight = FontWeight.Bold, fontSize = 11.sp, letterSpacing = 1.4.sp)
-                                        Text(team.substitutes.joinToString("\n"), color = Muted, fontSize = 13.sp, lineHeight = 21.sp)
+                                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                        Text(podcast.first, color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.ExtraBold)
+                                        Text(podcast.second, color = Color(0xFFFFB45E), fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                        Text(podcast.third, color = Muted, fontSize = 12.sp, lineHeight = 17.sp)
+                                        if (index == 0) Text("FEATURED PODCAST", color = Color(0xFFFFA2A8), fontSize = 9.sp, fontWeight = FontWeight.Black, letterSpacing = 1.sp)
                                     }
+                                    Icon(Icons.Filled.OpenInNew, contentDescription = "Select ${podcast.first}", tint = Color(0xFFFFA2A8))
                                 }
                             }
                         }
+                        Text("NOW LISTENING · ${podcasts[selectedPodcast].first}", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.ExtraBold)
+                        Text("Use the embedded podcast player below to play the latest episodes. Playback depends on the publisher's player and connection.", color = Muted, fontSize = 11.sp, lineHeight = 16.sp)
+                        Card(Modifier.fillMaxWidth().height(440.dp), shape = RoundedCornerShape(14.dp),
+                            colors = CardDefaults.cardColors(containerColor = Color.White)) {
+                            AndroidView(
+                                modifier = Modifier.fillMaxSize(),
+                                factory = { viewContext ->
+                                    WebView(viewContext).apply {
+                                        settings.javaScriptEnabled = true
+                                        settings.domStorageEnabled = true
+                                        settings.mediaPlaybackRequiresUserGesture = true
+                                        webViewClient = WebViewClient()
+                                        loadUrl(podcastUrls[selectedPodcast])
+                                    }
+                                },
+                                update = { webView ->
+                                    val target = podcastUrls[selectedPodcast]
+                                    if (webView.tag != target) {
+                                        webView.tag = target
+                                        webView.loadUrl(target)
+                                    }
+                                }
+                            )
+                        }
+                        Text("Podcast ratings and release schedules are shown as supplied; platforms may display slightly different ratings.", color = Muted, fontSize = 10.sp, lineHeight = 14.sp)
                     }
                     3 -> {
                         SectionHeader("RECENT RESULTS", "Latest result information available from public sources")
