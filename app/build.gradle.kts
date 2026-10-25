@@ -71,5 +71,6 @@ dependencies {
     implementation("org.jsoup:jsoup:1.18.3")
     implementation("io.coil-kt:coil-compose:2.7.0")
     implementation("io.coil-kt:coil-svg:2.7.0")
+    implementation("androidx.media3:media3-exoplayer:1.5.1")
     debugImplementation("androidx.compose.ui:ui-tooling")
 }
