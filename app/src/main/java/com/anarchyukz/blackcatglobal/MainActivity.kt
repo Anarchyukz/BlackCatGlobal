@@ -809,16 +809,26 @@ private fun BlackCatApp() {
                     0 -> {
                         // Use the exact user-supplied banner asset, cropped to a compact card.
                         Card(
-                            modifier = Modifier.fillMaxWidth(),
+                            modifier = Modifier.fillMaxWidth().clickable { selectedTab = 6 },
                             shape = RoundedCornerShape(16.dp),
                             colors = CardDefaults.cardColors(containerColor = Panel)
                         ) {
-                            Image(
-                                painter = painterResource(id = R.drawable.banner),
-                                contentDescription = "Local takeaway discounts",
-                                modifier = Modifier.fillMaxWidth().height(132.dp),
-                                contentScale = ContentScale.Crop
-                            )
+                            Column {
+                                Image(
+                                    painter = painterResource(id = R.drawable.banner),
+                                    contentDescription = "Local takeaway discounts — open sponsors",
+                                    modifier = Modifier.fillMaxWidth().height(132.dp),
+                                    contentScale = ContentScale.Crop
+                                )
+                                Text(
+                                    "LOCAL DISCOUNTS & SPONSORS  ›",
+                                    modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp),
+                                    color = Color(0xFFFFA2A8),
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    letterSpacing = 0.8.sp
+                                )
+                            }
                         }
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             Box(Modifier.size(8.dp).background(CatRed, RoundedCornerShape(50)))
@@ -1217,6 +1227,59 @@ private fun BlackCatApp() {
                         }
                         if (data?.previousFixture.isNullOrBlank() && data?.previousCupFixture.isNullOrBlank())
                             InfoPanel("No recent results found", "The app will retry when it refreshes its public sources.")
+                    }
+                    6 -> {
+                        SectionHeader("LOCAL DISCOUNTS & SPONSORS", "Support BlackCat Global and discover local businesses")
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(16.dp),
+                            colors = CardDefaults.cardColors(containerColor = Color(0xFF252027))
+                        ) {
+                            Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Text("SPONSOR DIRECTORY", color = Color(0xFFFFA2A8), fontSize = 11.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 1.3.sp)
+                                Text("20 spaces for local businesses and supporters", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                                Text("Sponsor logos, offers and links can be added to these spaces later. Tap a space to enquire about sponsoring it.", color = Muted, fontSize = 12.sp, lineHeight = 17.sp)
+                            }
+                        }
+                        for (rowIndex in 0 until 10) {
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                                for (columnIndex in 0..1) {
+                                    val slot = rowIndex * 2 + columnIndex + 1
+                                    Card(
+                                        modifier = Modifier.weight(1f).clickable {
+                                            val emailIntent = Intent(Intent.ACTION_SENDTO, Uri.parse("mailto:blackcatglobal@proton.me")).apply {
+                                                putExtra(Intent.EXTRA_SUBJECT, "BlackCat Global sponsor slot $slot enquiry")
+                                                putExtra(Intent.EXTRA_TEXT, "Hello, I'm interested in sponsor slot $slot in BlackCat Global.")
+                                            }
+                                            try {
+                                                context.startActivity(emailIntent)
+                                            } catch (_: android.content.ActivityNotFoundException) {
+                                                android.widget.Toast.makeText(context, "No email app is installed.", android.widget.Toast.LENGTH_LONG).show()
+                                            }
+                                        },
+                                        shape = RoundedCornerShape(14.dp),
+                                        colors = CardDefaults.cardColors(containerColor = Panel)
+                                    ) {
+                                        Column(
+                                            Modifier.fillMaxWidth().height(116.dp).padding(10.dp),
+                                            verticalArrangement = Arrangement.Center,
+                                            horizontalAlignment = Alignment.CenterHorizontally
+                                        ) {
+                                            Box(
+                                                Modifier.size(38.dp).background(Color(0xFF3A2028), RoundedCornerShape(12.dp)),
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                Icon(Icons.Filled.Public, contentDescription = null, tint = Color(0xFFFFA2A8), modifier = Modifier.size(22.dp))
+                                            }
+                                            Spacer(Modifier.height(8.dp))
+                                            Text("SPONSOR $slot", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.ExtraBold)
+                                            Text("Your logo here", color = Muted, fontSize = 10.sp)
+                                            Text("Enquire ↗", color = Color(0xFFFFA2A8), fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     }
                     else -> {
                         SectionHeader("SEARCH LISTINGS", "Filter the results currently loaded in the app")
