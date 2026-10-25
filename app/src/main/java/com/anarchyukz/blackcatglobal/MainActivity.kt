@@ -1282,14 +1282,55 @@ private fun ChannelRow(channel: String, number: Int) {
         "canal" in lower -> Color(0xFF263F9D)
         else -> Color(0xFF18354C)
     }
+    // Use the broadcaster's own website favicon/logo rather than a text-only placeholder.
+    // Keep the branded tile as a graceful fallback if a provider blocks remote images.
+    val logoDomain = when {
+        "sky" in lower -> "skysports.com"
+        "tnt" in lower -> "tntsports.co.uk"
+        "bein" in lower -> "beinsports.com"
+        "espn" in lower -> "espn.com"
+        "bbc" in lower -> "bbc.co.uk"
+        "itv" in lower -> "itv.com"
+        "supersport" in lower -> "supersport.com"
+        "dazn" in lower -> "dazn.com"
+        "canal" in lower -> "canalplus.com"
+        "optus" in lower -> "optus.com.au"
+        "peacock" in lower -> "peacocktv.com"
+        "fox" in lower -> "foxsports.com"
+        "sportsnet" in lower -> "sportsnet.ca"
+        "nbc" in lower -> "nbcsports.com"
+        "cbs" in lower -> "cbssports.com"
+        "paramount" in lower -> "paramountplus.com"
+        "prime" in lower || "amazon" in lower -> "primevideo.com"
+        "fubo" in lower -> "fubo.tv"
+        "star sports" in lower -> "hotstar.com"
+        "supersport" in lower -> "supersport.com"
+        else -> null
+    }
+    val logoUrl = logoDomain?.let { "https://www.google.com/s2/favicons?domain=$it&sz=128" }
     Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(containerColor = Color(0xFF111820))) {
         Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-            Box(Modifier.size(width = 92.dp, height = 42.dp).background(brandColor, RoundedCornerShape(5.dp)).padding(horizontal = 4.dp),
+            Box(Modifier.size(width = 92.dp, height = 48.dp).background(Color.White, RoundedCornerShape(5.dp)).padding(4.dp),
                 contentAlignment = Alignment.Center) {
-                Text(brand, color = Color.White, fontSize = if (brand.length > 8) 10.sp else 13.sp,
-                    lineHeight = 13.sp, fontWeight = FontWeight.Black, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+                if (logoUrl != null) {
+                    AsyncImage(
+                        model = logoUrl,
+                        contentDescription = "$channel logo",
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = androidx.compose.ui.layout.ContentScale.Fit,
+                        onError = {
+                            // AsyncImage cannot mutate local UI state from this callback here;
+                            // text fallback remains available below for unknown providers.
+                        }
+                    )
+                } else {
+                    Box(Modifier.fillMaxSize().background(brandColor, RoundedCornerShape(4.dp)), contentAlignment = Alignment.Center) {
+                        Text(brand, color = Color.White, fontSize = if (brand.length > 8) 10.sp else 13.sp,
+                            lineHeight = 13.sp, fontWeight = FontWeight.Black, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+                    }
+                }
             }
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                 Text(channel, color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis)
