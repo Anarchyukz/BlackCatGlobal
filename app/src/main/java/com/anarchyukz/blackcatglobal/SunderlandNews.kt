@@ -30,6 +30,36 @@ private val sunderlandRssFeeds = listOf(
             URLEncoder.encode("Sunderland AFC football news", StandardCharsets.UTF_8.name()) +
             "&hl=en-GB&gl=GB&ceid=GB:en"
     ),
+    NewsRssFeed(
+        "Sunderland AFC · latest",
+        "https://news.google.com/rss/search?q=" +
+            URLEncoder.encode("(Sunderland AFC OR SAFC OR \"Black Cats\") football", StandardCharsets.UTF_8.name()) +
+            "&hl=en-GB&gl=GB&ceid=GB:en"
+    ),
+    NewsRssFeed(
+        "Sunderland AFC · transfers",
+        "https://news.google.com/rss/search?q=" +
+            URLEncoder.encode("Sunderland AFC transfer news", StandardCharsets.UTF_8.name()) +
+            "&hl=en-GB&gl=GB&ceid=GB:en"
+    ),
+    NewsRssFeed(
+        "Roker Report · search",
+        "https://news.google.com/rss/search?q=" +
+            URLEncoder.encode("site:rokerreport.sbnation.com Sunderland", StandardCharsets.UTF_8.name()) +
+            "&hl=en-GB&gl=GB&ceid=GB:en"
+    ),
+    NewsRssFeed(
+        "ChronicleLive · Sunderland AFC",
+        "https://news.google.com/rss/search?q=" +
+            URLEncoder.encode("site:chroniclelive.co.uk/sport/football/sunderland-afc", StandardCharsets.UTF_8.name()) +
+            "&hl=en-GB&gl=GB&ceid=GB:en"
+    ),
+    NewsRssFeed(
+        "Sunderland Echo · football",
+        "https://news.google.com/rss/search?q=" +
+            URLEncoder.encode("site:sunderlandecho.com/sport/football/sunderland-afc", StandardCharsets.UTF_8.name()) +
+            "&hl=en-GB&gl=GB&ceid=GB:en"
+    ),
     NewsRssFeed("ChronicleLive · Sunderland", "https://www.chroniclelive.co.uk/all-about/sunderland?service=rss"),
     NewsRssFeed("Sunderland Echo", "https://www.sunderlandecho.com/rss"),
     NewsRssFeed("The Northern Echo", "https://www.thenorthernecho.co.uk/news/rss/"),
@@ -60,10 +90,22 @@ private val sunderlandRssFeeds = listOf(
  * Strict RSS/Atom reader. It deliberately rejects HTML responses and never scrapes
  * publisher webpages as a fallback. A broken/non-feed URL contributes zero articles.
  */
-internal fun loadSunderlandNews(): List<SunderlandNewsArticle> =
-    sunderlandRssFeeds.flatMap { feed ->
-        runCatching { readRssFeed(feed) }.getOrDefault(emptyList())
-    }.distinctBy { it.url }.sortedByDescending { it.published }.take(60)
+internal fun loadSunderlandNews(): List<SunderlandNewsArticle> {
+    val executor = java.util.concurrent.Executors.newFixedThreadPool(8)
+    return try {
+        val tasks = sunderlandRssFeeds.map { feed ->
+            executor.submit(java.util.concurrent.Callable {
+                runCatching { readRssFeed(feed) }.getOrDefault(emptyList())
+            })
+        }
+        tasks.flatMap { task ->
+            runCatching { task.get(14, java.util.concurrent.TimeUnit.SECONDS) }
+                .getOrDefault(emptyList())
+        }.distinctBy { it.url }.sortedByDescending { it.published }.take(80)
+    } finally {
+        executor.shutdownNow()
+    }
+}
 
 private fun readRssFeed(feed: NewsRssFeed): List<SunderlandNewsArticle> {
     val connection = (URL(feed.url).openConnection() as HttpURLConnection).apply {
