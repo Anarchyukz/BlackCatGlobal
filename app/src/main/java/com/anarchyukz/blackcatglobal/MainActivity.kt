@@ -1724,10 +1724,13 @@ private fun fetchPredictedLineups(fixture: String, sides: List<String>): List<Li
                 .substringBefore("Injuries")
                 .substringBefore("Unavailable")
                 .substringBefore("Doubtful")
-            val players = Regex("(?i)\\d+\\.\\s+\\d+\\s+(.+?)\\s+([GDMF])(?=\\s+\\d+\\.\\s+\\d+\\s+|\\s*$)")
+            // The page text can flatten list items differently across mobile/desktop HTML.
+            // First extract numbered shirt-number entries, then fall back to numbered names
+            // without relying on the position abbreviation being present in the text.
+            val players = Regex("(?i)(?:^|\\\\s)\\\\d+\\\\.\\\\s+\\\\d+\\\\s+(.+?)\\\\s+[GDMF](?=\\\\s+\\\\d+\\\\.\\\\s+\\\\d+\\\\s+|\\\\s*$)")
                 .findAll(listText)
                 .map { it.groupValues[1].trim().trimEnd(',', '.') }
-                .filter { it.length in 2..60 }
+                .filter { it.length in 2..60 && !it.contains("Projected from", true) }
                 .distinct()
                 .take(11)
                 .toList()
@@ -1741,6 +1744,7 @@ private fun fetchPredictedLineups(fixture: String, sides: List<String>): List<Li
 
     val directUrls = buildList {
         if (fixture.contains("Sunderland", true) && fixture.contains("Leeds", true)) {
+            // Try both current fixture-specific sources before doing a search.
             add("https://likelylineups.com/sunderland-vs-leeds-united-lineups/")
         }
         val query = "\"$fixture\" lineups site:likelylineups.com"
