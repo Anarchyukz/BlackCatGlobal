@@ -520,7 +520,8 @@ private fun BlackCatApp() {
                                         }.thenByDescending { it.published }
                                     )
                                 "Local News" -> newsArticles.filter { isLocalPublisher(it) && !isSunderlandFootball(it) }
-                                else -> newsArticles.filterNot { isSunderlandFootball(it) }
+                                    .sortedByDescending { it.published }
+                                else -> newsArticles.filter { isSunderlandFootball(it) }
                             }
                         }
                         Row(
@@ -531,9 +532,6 @@ private fun BlackCatApp() {
                             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                                 Text("SUNDERLAND NEWS", color = CatRed, fontWeight = FontWeight.ExtraBold, fontSize = 12.sp, letterSpacing = 1.4.sp)
                                 Text("RSS FEEDS · AUTO-REFRESH EVERY 5 MIN", color = Muted, fontSize = 9.sp)
-                            }
-                            androidx.compose.material3.IconButton(onClick = { newsRefreshToken++ }) {
-                                Icon(Icons.Filled.Refresh, contentDescription = "Refresh RSS feeds", tint = if (newsLoading) CatRed else Muted)
                             }
                         }
                         Text(
@@ -546,7 +544,7 @@ private fun BlackCatApp() {
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
-                            listOf("Sunderland AFC", "General News", "Local News").forEach { category ->
+                            listOf("Sunderland AFC", "Local News").forEach { category ->
                                 Button(
                                     onClick = { newsCategory = category },
                                     modifier = Modifier.weight(1f).heightIn(min = 42.dp),
@@ -583,13 +581,10 @@ private fun BlackCatApp() {
                                         fontWeight = FontWeight.Bold
                                     )
                                     Text(
-                                        if (newsArticles.isEmpty()) "The feeds may be temporarily unavailable. Try refreshing." else "Try General News or refresh the RSS feeds for the latest headlines.",
+                                        if (newsArticles.isEmpty()) "The feeds may be temporarily unavailable. Use the refresh icon at the top of the screen to try again." else "There are no articles in this section yet. Use the refresh icon at the top of the screen to reload the feeds.",
                                         color = Muted,
                                         fontSize = 12.sp
                                     )
-                                    Button(onClick = { newsRefreshToken++ }, colors = ButtonDefaults.buttonColors(containerColor = CatRed)) {
-                                        Text("Refresh feeds")
-                                    }
                                 }
                             }
                         } else {
@@ -1331,9 +1326,19 @@ private fun loadDashboard(context: android.content.Context): DashboardData {
         if (!kickoff.isNullOrBlank()) fixtureSource = "Google match listing"
     }
 
-    val searchResults = (if (fixture != null) fetchWorldwideSearchResults(fixture) else emptyList()) +
-        (if (fixture != null) curatedBroadcastResults(fixture) else emptyList())
-    val lineups = if (fixture != null) fetchLineups(fixture) else emptyList()
+    // Use the dedicated fixture feed as the source of truth for TV searches and line-ups.
+    // The scraped guide headline can lag behind when a broadcaster rolls over to the next match.
+    val nextFixtureForFeeds = runCatching { loadSunderlandFixtures().minByOrNull { it.sortTime } }.getOrNull()
+    val fixtureFromFeed = nextFixtureForFeeds?.let {
+        if (it.venue.equals("Home", true)) "Sunderland vs ${it.opponent}" else "${it.opponent} vs Sunderland"
+    }
+    val pinnedFixtureForFeeds = prefs.getString("pinned_fixture", null).takeIf {
+        val pinnedTime = prefs.getLong("pinned_kickoff", 0L)
+        !it.isNullOrBlank() && pinnedTime > 0L && now < pinnedTime + 90L * 60L * 1000L
+    }
+    val fixtureForFeeds = pinnedFixtureForFeeds ?: fixtureFromFeed ?: fixture
+    val searchResults = if (!fixtureForFeeds.isNullOrBlank()) fetchWorldwideSearchResults(fixtureForFeeds) else emptyList()
+    val lineups = if (!fixtureForFeeds.isNullOrBlank()) fetchLineups(fixtureForFeeds) else emptyList()
     val squadPlayers = fetchPremierLeagueSquad()
 
     // Keep the selected fixture pinned from kick-off until the end of its 90-minute window.
@@ -1534,10 +1539,18 @@ private fun fetchPredictedLineups(fixture: String, sides: List<String>): List<Li
         val search = Jsoup.connect("https://www.google.com/search?q=" + enc(query) + "&num=8")
             .userAgent("Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/124.0 Mobile Safari/537.36")
             .timeout(9000).get()
-        val articleUrl = search.select("a[href]").mapNotNull { it.absUrl("href").takeIf { url ->
-            url.contains("sportsmole.co.uk/football/", true) &&
-                url.contains("preview", true) && !url.contains("google.com", true)
-        } }.firstOrNull() ?: return emptyList()
+        val articleUrl = search.select("a[href]").mapNotNull { anchor ->
+            val raw = anchor.absUrl("href")
+            val resolved = if (raw.contains("google.com/url", true)) {
+                Uri.parse(raw).getQueryParameter("q")
+                    ?: Uri.parse(raw).getQueryParameter("url")
+                    ?: raw
+            } else raw
+            resolved.takeIf { url ->
+                url.contains("sportsmole.co.uk/football/", true) &&
+                    url.contains("preview", true) && !url.contains("google.com", true)
+            }
+        }.firstOrNull() ?: return emptyList()
         val doc = Jsoup.connect(articleUrl)
             .userAgent("Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/124.0 Mobile Safari/537.36")
             .timeout(10000).get()
