@@ -555,14 +555,16 @@ private fun BlackCatApp() {
                             when (newsCategory) {
                                 "Sunderland AFC" -> newsArticles.filter { isSunderlandFootball(it) }
                                     .sortedWith(
-                                        compareBy<SunderlandNewsArticle> {
-                                            if (it.source.contains("Roker Report", true) ||
-                                                it.url.contains("rokerreport.sbnation.com", true)) 0 else 1
-                                        }.thenByDescending { it.published }
+                                        compareByDescending<SunderlandNewsArticle> { it.publishedTimestamp }
+                                            .thenBy {
+                                                if (it.source.contains("Roker Report", true) ||
+                                                    it.url.contains("rokerreport.sbnation.com", true)) 0 else 1
+                                            }
                                     )
                                 "Local News" -> newsArticles.filter { isLocalPublisher(it) && !isSunderlandFootball(it) }
-                                    .sortedByDescending { it.published }
+                                    .sortedByDescending { it.publishedTimestamp }
                                 else -> newsArticles.filter { isSunderlandFootball(it) }
+                                    .sortedByDescending { it.publishedTimestamp }
                             }
                         }
                         Row(
