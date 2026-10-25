@@ -670,15 +670,13 @@ private fun BlackCatApp() {
                             ) {
                                 Text("NEXT FIXTURE", color = Color(0xFFFFA2A8), fontSize = 11.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 2.sp)
                                 FixtureMatchup(
-                                    fixture = nextSunderlandFixture?.let {
-                                        if (it.venue == "Home") "Sunderland vs ${it.opponent}" else "${it.opponent} vs Sunderland"
-                                    } ?: data?.fixture ?: if (fixturesLoading || loading) "Finding Sunderland's next match…" else "Fixture unavailable"
+                                    fixture = data?.fixture
+                                        ?: if (loading) "Finding Sunderland's next match…" else "Fixture unavailable"
                                 )
                                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                     Icon(Icons.Filled.SportsSoccer, contentDescription = null, tint = CatRed, modifier = Modifier.size(19.dp))
                                     Text(
-                                        nextSunderlandFixture?.let { "${it.competition} · ${it.date} · ${it.venue}" }
-                                            ?: data?.kickoff ?: "Kick-off time will appear when confirmed",
+                                        data?.kickoff ?: "Kick-off time will appear when confirmed",
                                         color = Muted, fontSize = 13.sp, lineHeight = 18.sp
                                     )
                                 }
