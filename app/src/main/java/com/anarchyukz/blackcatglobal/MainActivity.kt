@@ -240,6 +240,10 @@ private fun BlackCatApp() {
     var leagueRefreshToken by remember { mutableIntStateOf(0) }
     var fixturesLoading by remember { mutableStateOf(true) }
     var upcomingFixtures by remember { mutableStateOf<List<SunderlandFixture>>(emptyList()) }
+    var worldwideSearchResults by remember { mutableStateOf<List<WebResult>>(emptyList()) }
+    var worldwideSearchLoading by remember { mutableStateOf(false) }
+    var lineupTeams by remember { mutableStateOf<List<LineupTeam>>(emptyList()) }
+    var lineupsLoading by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
     var analyticsSnapshotLogged by remember { mutableStateOf(false) }
     var checkingUpdate by remember { mutableStateOf(false) }
@@ -318,6 +322,57 @@ private fun BlackCatApp() {
     // Use the dedicated cross-competition fixture feed on the main TV screen too.
     // The dashboard search result can be stale or only include a league fixture.
     val nextSunderlandFixture = upcomingFixtures.minByOrNull { it.sortTime }
+
+    fun selectedFixtureForLiveData(): String? {
+        if (data?.fixtureSource?.contains("Current match", true) == true && !data.fixture.isNullOrBlank()) {
+            return data.fixture
+        }
+        return nextSunderlandFixture?.let {
+            if (it.venue.equals("Home", true)) "Sunderland vs ${it.opponent}" else "${it.opponent} vs Sunderland"
+        } ?: data?.fixture
+    }
+
+    // Fetch channels and line-ups independently so a slow search engine cannot leave
+    // the team tab empty or hold up all TV-guide results.
+    LaunchedEffect(selectedFixtureForLiveData(), refreshToken) {
+        val target = selectedFixtureForLiveData()
+        if (target.isNullOrBlank()) {
+            worldwideSearchResults = emptyList()
+            lineupTeams = emptyList()
+            worldwideSearchLoading = false
+            lineupsLoading = false
+        } else {
+            worldwideSearchLoading = true
+            lineupsLoading = true
+            val channelJob = kotlinx.coroutines.async(Dispatchers.IO) {
+                runCatching { fetchWorldwideSearchResults(target) }.getOrDefault(emptyList())
+            }
+            val lineupJob = kotlinx.coroutines.async(Dispatchers.IO) {
+                runCatching { fetchLineups(target) }.getOrDefault(emptyList())
+            }
+            worldwideSearchResults = channelJob.await()
+            worldwideSearchLoading = false
+            lineupTeams = lineupJob.await()
+            lineupsLoading = false
+        }
+        while (true) {
+            kotlinx.coroutines.delay(5 * 60_000L)
+            val target = selectedFixtureForLiveData() ?: continue
+            worldwideSearchLoading = true
+            lineupsLoading = true
+            val channelJob = kotlinx.coroutines.async(Dispatchers.IO) {
+                runCatching { fetchWorldwideSearchResults(target) }.getOrDefault(emptyList())
+            }
+            val lineupJob = kotlinx.coroutines.async(Dispatchers.IO) {
+                runCatching { fetchLineups(target) }.getOrDefault(emptyList())
+            }
+            worldwideSearchResults = channelJob.await()
+            worldwideSearchLoading = false
+            lineupTeams = lineupJob.await()
+            lineupsLoading = false
+        }
+    }
+
     // Prefer TV Guide UK's exact match page, but don't leave the channel list blank
     // when that one source changes its markup or blocks the detail-page request.
     // Other guide results are only fallback candidates when their own fixture card
@@ -360,7 +415,7 @@ private fun BlackCatApp() {
         // The international search is already queried using this exact fixture.
         // Use a result only if its own title/snippet names both teams; never use the
         // hard-coded illustrative examples or generic broadcaster search results.
-        val searchedChannels = data?.searchResults.orEmpty()
+        val searchedChannels = worldwideSearchResults
             .filter { it.source != "International match TV listings (unverified)" }
             .filter { result -> mentionsSameFixture("${result.title} ${result.snippet}") }
             .flatMap { it.channels }
@@ -382,8 +437,8 @@ private fun BlackCatApp() {
             it.context.orEmpty().contains(searchQuery, true) ||
             it.channels.any { channel -> channel.contains(searchQuery, true) } }
     }
-    val filteredSearchResults = remember(data, searchQuery) {
-        data?.searchResults.orEmpty().filter { searchQuery.isBlank() ||
+    val filteredSearchResults = remember(worldwideSearchResults, searchQuery) {
+        worldwideSearchResults.filter { searchQuery.isBlank() ||
             it.title.contains(searchQuery, true) || it.snippet.contains(searchQuery, true) ||
             it.channels.any { channel -> channel.contains(searchQuery, true) } }
     }
@@ -828,16 +883,18 @@ private fun BlackCatApp() {
                     }
                     2 -> {
                         SectionHeader("TEAM & LINE-UPS", "Confirmed XIs when announced · predicted XIs clearly labelled")
-                        if (data?.lineups.isNullOrEmpty()) {
-                            InfoPanel("Line-ups not available yet",
-                                "Starting XIs are usually published closer to kick-off. The registered squad below is not a confirmed match-day team.")
+                        if (lineupTeams.isEmpty()) {
+                            InfoPanel(
+                                if (lineupsLoading) "Checking team line-ups…" else "Predicted line-ups not found yet",
+                                if (lineupsLoading) "Checking the fixture-specific team sheet and reputable predicted-line-up sources." else "Confirmed XIs usually appear shortly before kick-off. No predicted XI was found from the sources checked, so no player names have been guessed."
+                            )
                             if (!data?.squadPlayers.isNullOrEmpty()) {
                                 SectionHeader("REGISTERED PREMIER LEAGUE SQUAD", "Squad numbers · 2026/27")
                                 Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(18.dp), colors = CardDefaults.cardColors(containerColor = Panel)) {
                                     Text(data!!.squadPlayers.joinToString("\n"), Modifier.fillMaxWidth().padding(16.dp), color = Color.White, fontSize = 14.sp, lineHeight = 23.sp)
                                 }
                             }
-                        } else data!!.lineups.forEach { team ->
+                        } else lineupTeams.forEach { team ->
                             Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(containerColor = Panel)) {
                                 Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                                     Text(team.name.uppercase(), color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Black)
