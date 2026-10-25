@@ -1133,7 +1133,6 @@ private fun BlackCatApp() {
                                 }
                                 }
                             }
-                        }
                         Text("LATEST EPISODES", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.ExtraBold)
                         when {
                             feedLoading -> InfoPanel("Loading episodes…", "Fetching the podcast RSS feed.")
