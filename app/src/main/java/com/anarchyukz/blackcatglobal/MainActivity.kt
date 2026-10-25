@@ -342,7 +342,7 @@ private fun BlackCatApp() {
             // Some fixtures are abbreviated by TV guides (e.g. "Leeds" rather than
             // "Leeds United"). Sunderland-specific pages plus the opponent token still
             // identify the match; requiring every suffix word incorrectly discarded them.
-            targetTeams.filterNot { it == "sunderland" }.all { team ->
+            return targetTeams.filterNot { it == "sunderland" }.all { team ->
                 if (listed.contains(team)) true else {
                     val distinguishingWords = team.split(Regex("\\s+"))
                         .filter { it.length >= 4 && it !in setOf("united", "city", "town", "athletic", "rovers", "county") }
@@ -1530,7 +1530,7 @@ private fun fetchLineups(fixture: String): List<LineupTeam> {
 
 private fun fetchPredictedLineups(fixture: String, sides: List<String>): List<LineupTeam> {
     return try {
-        val query = "\\"$fixture\\" predicted lineups site:sportsmole.co.uk/football"
+        val query = """ "$fixture" predicted lineups site:sportsmole.co.uk/football """
         val search = Jsoup.connect("https://www.google.com/search?q=" + enc(query) + "&num=8")
             .userAgent("Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/124.0 Mobile Safari/537.36")
             .timeout(9000).get()
