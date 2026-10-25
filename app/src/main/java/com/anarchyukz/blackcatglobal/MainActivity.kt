@@ -1895,44 +1895,51 @@ private fun fetchWorldwideSearchResults(fixture: String): List<WebResult> {
         "Brazil" to "\"$fixture\" ESPN Brasil TNT Sports Brasil BandSports transmissão",
         "Portugal" to "\"$fixture\" Sport TV Portugal Premier League transmissão"
     )
-    val results = mutableListOf<WebResult>()
     val agent = "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/124.0 Mobile Safari/537.36"
-
-    for ((region, query) in queries) {
-        try {
-            val google = Jsoup.connect("https://www.google.com/search?q=" + enc(query) + "&num=6")
-                .userAgent(agent)
-                .timeout(5500)
-                .get()
-            val blocks = google.select("div.MjjYud, div.g, div.tF2Cxc")
-            blocks.forEach { block ->
-                val title = block.selectFirst("h3")?.text()?.trim().orEmpty()
-                val snippet = block.selectFirst("div.VwiC3b, div[data-sncf], span.aCOpRe, div.IsZvec")?.text()?.trim().orEmpty()
-                if (title.isNotBlank()) {
-                    val combined = "$title $snippet"
-                    val found = broadcasterTerms.filter { combined.contains(it, ignoreCase = true) }
-                        .distinctBy { it.lowercase() }
-                    results.add(WebResult(title, snippet, "Google", region, found))
+    // Query regions concurrently: sequential Google + Bing requests could take several
+    // minutes and previously delayed the line-up screen as well as the TV listings.
+    val executor = java.util.concurrent.Executors.newFixedThreadPool(10)
+    val futures = queries.map { (region, query) ->
+        executor.submit(java.util.concurrent.Callable {
+            val local = mutableListOf<WebResult>()
+            try {
+                val google = Jsoup.connect("https://www.google.com/search?q=" + enc(query) + "&num=6")
+                    .userAgent(agent).timeout(4500).get()
+                google.select("div.MjjYud, div.g, div.tF2Cxc").forEach { block ->
+                    val title = block.selectFirst("h3")?.text()?.trim().orEmpty()
+                    val snippet = block.selectFirst("div.VwiC3b, div[data-sncf], span.aCOpRe, div.IsZvec")?.text()?.trim().orEmpty()
+                    if (title.isNotBlank()) {
+                        val combined = "$title $snippet"
+                        val found = broadcasterTerms.filter { combined.contains(it, ignoreCase = true) }
+                            .distinctBy { it.lowercase() }
+                        local.add(WebResult(title, snippet, "Google", region, found))
+                    }
                 }
-            }
-        } catch (_: Exception) { }
-
-        try {
-            val bing = Jsoup.connect("https://www.bing.com/search?q=" + enc(query) + "&count=6")
-                .userAgent(agent)
-                .timeout(5500)
-                .get()
-            bing.select("li.b_algo").forEach { block ->
-                val title = block.selectFirst("h2")?.text()?.trim().orEmpty()
-                val snippet = block.selectFirst("p")?.text()?.trim().orEmpty()
-                if (title.isNotBlank()) {
-                    val combined = "$title $snippet"
-                    val found = broadcasterTerms.filter { combined.contains(it, ignoreCase = true) }
-                        .distinctBy { it.lowercase() }
-                    results.add(WebResult(title, snippet, "Bing", region, found))
+            } catch (_: Exception) { }
+            try {
+                val bing = Jsoup.connect("https://www.bing.com/search?q=" + enc(query) + "&count=6")
+                    .userAgent(agent).timeout(4500).get()
+                bing.select("li.b_algo").forEach { block ->
+                    val title = block.selectFirst("h2")?.text()?.trim().orEmpty()
+                    val snippet = block.selectFirst("p")?.text()?.trim().orEmpty()
+                    if (title.isNotBlank()) {
+                        val combined = "$title $snippet"
+                        val found = broadcasterTerms.filter { combined.contains(it, ignoreCase = true) }
+                            .distinctBy { it.lowercase() }
+                        local.add(WebResult(title, snippet, "Bing", region, found))
+                    }
                 }
-            }
-        } catch (_: Exception) { }
+            } catch (_: Exception) { }
+            local
+        })
+    }
+    val results = mutableListOf<WebResult>()
+    try {
+        futures.forEach { future ->
+            runCatching { results.addAll(future.get(22, java.util.concurrent.TimeUnit.SECONDS)) }
+        }
+    } finally {
+        executor.shutdownNow()
     }
 
     // Keep a larger set because each regional query can reveal a different official listing.
