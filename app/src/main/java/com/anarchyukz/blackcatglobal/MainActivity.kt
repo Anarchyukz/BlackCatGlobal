@@ -126,6 +126,44 @@ private val DeepBackground = Color(0xFF101114)
 private val Panel = Color(0xFF1B1D22)
 private val Muted = Color(0xFFB7BAC3)
 
+@Composable
+private fun BlackCatAppWithSplash() {
+    var showSplash by remember { mutableStateOf(true) }
+    LaunchedEffect(Unit) {
+        kotlinx.coroutines.delay(1800L)
+        showSplash = false
+    }
+    Box(Modifier.fillMaxSize()) {
+        if (showSplash) {
+            Box(
+                modifier = Modifier.fillMaxSize().background(Color(0xFF09090B)),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 28.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(18.dp)
+                ) {
+                    Image(
+                        painter = painterResource(id = R.drawable.bcg),
+                        contentDescription = "BlackCat Global artwork",
+                        modifier = Modifier.fillMaxWidth().heightIn(max = 340.dp),
+                        contentScale = ContentScale.Fit
+                    )
+                    Text("BlackCat Global", color = Color.White, fontWeight = FontWeight.Black,
+                        fontSize = 28.sp, letterSpacing = 0.2.sp)
+                    Text("SUNDERLAND AFC", color = Color(0xFFFFA2A8), fontSize = 11.sp,
+                        letterSpacing = 3.sp, fontWeight = FontWeight.Bold)
+                    Spacer(Modifier.height(8.dp))
+                    CircularProgressIndicator(modifier = Modifier.size(22.dp), color = CatRed, strokeWidth = 2.dp)
+                }
+            }
+        } else {
+            BlackCatApp()
+        }
+    }
+}
+
 private data class GuideResult(
     val name: String,
     val fixture: String?,
@@ -210,7 +248,7 @@ class MainActivity : ComponentActivity() {
                 surface = Panel,
                 onSurface = Color.White
             )) {
-                BlackCatApp()
+                BlackCatAppWithSplash()
             }
         }
     }
@@ -468,12 +506,12 @@ private fun BlackCatApp() {
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween) {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        Box(
-                            Modifier.size(46.dp).background(Color(0xFF301B22), RoundedCornerShape(14.dp)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text("\uD83D\uDC08\u200D\u2B1B", fontSize = 27.sp, maxLines = 1)
-                        }
+                        Image(
+                            painter = painterResource(id = R.drawable.bcg),
+                            contentDescription = "BlackCat Global logo",
+                            modifier = Modifier.size(46.dp),
+                            contentScale = ContentScale.Crop
+                        )
                         Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                             Text("BlackCat Global", color = Color.White, fontWeight = FontWeight.Black, fontSize = 19.sp, letterSpacing = 0.1.sp, maxLines = 1)
                             Text("SUNDERLAND AFC", color = Color(0xFFFFA2A8), fontSize = 9.sp, letterSpacing = 1.8.sp, fontWeight = FontWeight.Bold)
