@@ -170,8 +170,8 @@ private suspend fun loadPodcastEpisodes(feed: PodcastFeed): List<PodcastEpisode>
 }
 
 private val CatRed = Color(0xFFE53945)
-private val DeepBackground = Color(0xFF101114)
-private val Panel = Color(0xFF1B1D22)
+private val DeepBackground = Color(0xFF0A0E16)
+private val Panel = Color(0xC91B202A)
 private val Muted = Color(0xFFB7BAC3)
 
 @Composable
@@ -181,7 +181,13 @@ private fun BlackCatAppWithSplash() {
         kotlinx.coroutines.delay(1800L)
         showSplash = false
     }
-    Box(Modifier.fillMaxSize()) {
+    Box(
+        Modifier.fillMaxSize().background(
+            androidx.compose.ui.graphics.Brush.linearGradient(
+                listOf(Color(0xFF111827), Color(0xFF090B11), Color(0xFF21131A))
+            )
+        )
+    ) {
         if (showSplash) {
             Box(
                 modifier = Modifier.fillMaxSize().background(Color(0xFF09090B)),
@@ -575,7 +581,7 @@ private fun BlackCatApp() {
                     Card(
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(12.dp),
-                        colors = CardDefaults.cardColors(containerColor = Color(0xFF282027))
+                        colors = CardDefaults.cardColors(containerColor = Color(0xC8282028))
                     ) {
                         Row(
                             modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp),
@@ -688,10 +694,13 @@ private fun BlackCatApp() {
                                                     it.url.contains("rokerreport.sbnation.com", true)) 0 else 1
                                             }
                                     )
-                                "Local News" -> // Local coverage can include Sunderland AFC and other local football stories too.
-                                // Keep local-publisher filtering and the illegal-stream spam filter, but do not exclude football articles.
-                                newsArticles.filter { !isFootballStreamSpam(it) && isLocalPublisher(it) }
-                                    .sortedByDescending { it.publishedTimestamp }
+                                "Local News" -> // Keep local football stories, but route Sunderland Echo sports coverage to Sunderland AFC.
+                                newsArticles.filter {
+                                    !isFootballStreamSpam(it) &&
+                                        isLocalPublisher(it) &&
+                                        !it.source.contains("Sunderland Echo", true) &&
+                                        !it.url.contains("sunderlandecho.com", true)
+                                }.sortedByDescending { it.publishedTimestamp }
                                 else -> newsArticles.filter { !isFootballStreamSpam(it) && isSunderlandFootball(it) }
                                     .sortedByDescending { it.publishedTimestamp }
                             }
