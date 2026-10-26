@@ -147,7 +147,7 @@ private fun parseSunderlandFixture(element: Element, source: String, now: Long, 
     ).find(text) ?: return null
     val home = matchup.groupValues[1].isNotBlank()
     val opponent = (if (home) matchup.groupValues[2] else matchup.groupValues[3])
-        .replace(Regex("(?i)\\s+(kick[- ]?off|starts? at|\\d{1,2}[.:]\\d{2}.*)$"), "")
+        .replace(Regex("(?i)\\s+(?:kick(?:[- ]?off)?\\b.*|starts? at\\b.*|\\d{1,2}[.:]\\d{2}.*)$"), "")
         .trim().trimEnd('.', ':')
     if (opponent.isBlank() || opponent.contains("Sunderland", true)) return null
 
