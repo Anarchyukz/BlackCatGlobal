@@ -18,6 +18,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -497,8 +498,7 @@ private fun BlackCatApp() {
     val filteredGuides = remember(data, searchQuery) {
         data?.guides.orEmpty().filter { searchQuery.isBlank() ||
             it.name.contains(searchQuery, true) || it.fixture.orEmpty().contains(searchQuery, true) ||
-            it.context.orEmpty().contains(searchQuery, true) ||            it.channels.any { channel -> channel.contains(searchQuery, true) } }    }    // Display only live search results that explicitly identify this fixture.    // Unverified regional broadcaster directories are deliberately not presented as listings.
-    val filteredSearchResults = remember(worldwideSearchResults, searchQuery) {
+            it.context.orEmpty().contains(searchQuery, true) ||            it.channels.any { channel -> channel.contains(searchQuery, true) } }    }    // Display only live search results that explicitly identify this fixture.    // Unverified regional broadcaster directories are deliberately not presented as listings.    val filteredSearchResults = remember(worldwideSearchResults, searchQuery) {
         worldwideSearchResults
             .distinctBy { (it.title + "|" + it.region).lowercase() }
             .filter { searchQuery.isBlank() ||
@@ -997,8 +997,7 @@ private fun BlackCatApp() {
                                     Text(
                                         nextSunderlandFixture?.date ?: data?.kickoff
                                             ?: "Kick-off time will appear when confirmed",
-                                        color = Muted, fontSize = 13.sp, lineHeight = 18.sp
-                                    )
+                                        color = Muted, fontSize = 13.sp, lineHeight = 18.sp                                    )
                                 }
                                 androidx.compose.material3.HorizontalDivider(color = Color(0xFF4B343A))
                                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
@@ -1497,8 +1496,7 @@ private fun BlackCatApp() {
 
     if (updateInfo != null && updateInfo!!.versionCode > BuildConfig.VERSION_CODE) {
         AlertDialog(
-            onDismissRequest = { updateInfo = null },
-            title = { Text("Update available") },
+            onDismissRequest = { updateInfo = null },            title = { Text("Update available") },
             text = { Text("Black Cat Global ${updateInfo!!.tag} is available. Your current version is ${BuildConfig.VERSION_NAME}. Open the APK download page to install the update.") },
             confirmButton = {
                 TextButton(onClick = {
@@ -1997,8 +1995,7 @@ private fun loadDashboard(context: android.content.Context): DashboardData {
             .userAgent("Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/124.0 Mobile Safari/537.36")
             .timeout(12000)
             .get()
-        val resultRows = resultsDoc.select("tr").mapNotNull { row ->
-            val text = row.text().replace(Regex("\\s+"), " ").trim()
+        val resultRows = resultsDoc.select("tr").mapNotNull { row ->            val text = row.text().replace(Regex("\\s+"), " ").trim()
             if (!text.contains("Sunderland", ignoreCase = true) ||
                 !Regex("\\b\\d{1,2}\\s*[-–:]\\s*\\d{1,2}\\b").containsMatchIn(text)) return@mapNotNull null
             val dateMatch = Regex("\\b\\d{1,2}\\s+[A-Za-z]{3,9}\\s+20\\d{2}\\b").find(text)
@@ -2497,8 +2494,7 @@ private fun extractFixtureSpecificChannels(url: String, fixture: String?): List<
     }
 }
 
-private fun extractBroadcastersNearFixture(
-    doc: org.jsoup.nodes.Document,
+private fun extractBroadcastersNearFixture(    doc: org.jsoup.nodes.Document,
     anchor: org.jsoup.nodes.Element?,
     fixture: String?
 ): String {
