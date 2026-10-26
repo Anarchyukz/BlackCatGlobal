@@ -498,7 +498,10 @@ private fun BlackCatApp() {
     val filteredGuides = remember(data, searchQuery) {
         data?.guides.orEmpty().filter { searchQuery.isBlank() ||
             it.name.contains(searchQuery, true) || it.fixture.orEmpty().contains(searchQuery, true) ||
-            it.context.orEmpty().contains(searchQuery, true) ||            it.channels.any { channel -> channel.contains(searchQuery, true) } }    }    // Display only live search results that explicitly identify this fixture.    // Unverified regional broadcaster directories are deliberately not presented as listings.    val filteredSearchResults = remember(worldwideSearchResults, searchQuery) {
+            it.context.orEmpty().contains(searchQuery, true) ||            it.channels.any { channel -> channel.contains(searchQuery, true) } }
+    }    // Display only live search results that explicitly identify this fixture.
+    // Unverified regional broadcaster directories are deliberately not presented as listings.
+    val filteredSearchResults = remember(worldwideSearchResults, searchQuery) {
         worldwideSearchResults
             .distinctBy { (it.title + "|" + it.region).lowercase() }
             .filter { searchQuery.isBlank() ||
@@ -997,13 +1000,16 @@ private fun BlackCatApp() {
                                     Text(
                                         nextSunderlandFixture?.date ?: data?.kickoff
                                             ?: "Kick-off time will appear when confirmed",
-                                        color = Muted, fontSize = 13.sp, lineHeight = 18.sp                                    )
+                                        color = Muted, fontSize = 13.sp, lineHeight = 18.sp
+                                    )
                                 }
                                 androidx.compose.material3.HorizontalDivider(color = Color(0xFF4B343A))
                                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.SpaceBetween) {                                    Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                                        Text("WORLDWIDE TV", color = Muted, fontSize = 10.sp, letterSpacing = 1.3.sp, fontWeight = FontWeight.Bold)                                        Text("${channels.size} channel${if (channels.size == 1) "" else "s"} found", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 15.sp)
-                                    }                                    androidx.compose.material3.TextButton(onClick = { selectedTab = 0 }) {
+                                        Text("WORLDWIDE TV", color = Muted, fontSize = 10.sp, letterSpacing = 1.3.sp, fontWeight = FontWeight.Bold)
+                                        Text("${channels.size} channel${if (channels.size == 1) "" else "s"} found", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                                    }
+                                    androidx.compose.material3.TextButton(onClick = { selectedTab = 0 }) {
                                         Text("View channels  ›", color = Color(0xFFFF8B93), fontWeight = FontWeight.Bold)
                                     }                                }
                             }
@@ -1468,7 +1474,8 @@ private fun BlackCatApp() {
                                     updateMessage = null
                                     scope.launch {                                        val result = withContext(Dispatchers.IO) { checkForGitHubUpdate() }
                                         checkingUpdate = false
-                                        updateInfo = result                                        updateMessage = when {
+                                        updateInfo = result
+                                        updateMessage = when {
                                             result == null -> "Couldn't check for updates. Check your internet connection and try again."
                                             result.versionCode > BuildConfig.VERSION_CODE -> null                                            else -> "You're using the latest version."
                                         }
@@ -1496,12 +1503,14 @@ private fun BlackCatApp() {
 
     if (updateInfo != null && updateInfo!!.versionCode > BuildConfig.VERSION_CODE) {
         AlertDialog(
-            onDismissRequest = { updateInfo = null },            title = { Text("Update available") },
+            onDismissRequest = { updateInfo = null },
+            title = { Text("Update available") },
             text = { Text("Black Cat Global ${updateInfo!!.tag} is available. Your current version is ${BuildConfig.VERSION_NAME}. Open the APK download page to install the update.") },
             confirmButton = {
                 TextButton(onClick = {
                     val url = updateInfo!!.downloadUrl
-                    updateInfo = null                    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+                    updateInfo = null
+                    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
                 }) { Text("Download update") }
             },
             dismissButton = { TextButton(onClick = { updateInfo = null }) { Text("Not now") } }
@@ -1859,7 +1868,7 @@ private fun ChannelRow(channel: String, number: Int) {
                 ))
                 .padding(horizontal = 13.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)
-       ) {
+        ) {
             var logoFailed by remember(logoUrl) { mutableStateOf(false) }
             Box(Modifier.size(width = 92.dp, height = 48.dp).background(Color.White, RoundedCornerShape(9.dp)).padding(5.dp),
                 contentAlignment = Alignment.Center) {
@@ -1995,7 +2004,8 @@ private fun loadDashboard(context: android.content.Context): DashboardData {
             .userAgent("Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/124.0 Mobile Safari/537.36")
             .timeout(12000)
             .get()
-        val resultRows = resultsDoc.select("tr").mapNotNull { row ->            val text = row.text().replace(Regex("\\s+"), " ").trim()
+        val resultRows = resultsDoc.select("tr").mapNotNull { row ->
+            val text = row.text().replace(Regex("\\s+"), " ").trim()
             if (!text.contains("Sunderland", ignoreCase = true) ||
                 !Regex("\\b\\d{1,2}\\s*[-–:]\\s*\\d{1,2}\\b").containsMatchIn(text)) return@mapNotNull null
             val dateMatch = Regex("\\b\\d{1,2}\\s+[A-Za-z]{3,9}\\s+20\\d{2}\\b").find(text)
@@ -2009,7 +2019,8 @@ private fun loadDashboard(context: android.content.Context): DashboardData {
                     try {
                         val parser = java.text.SimpleDateFormat(pattern, java.util.Locale.UK)
                         parser.isLenient = false
-                        parser.parse(yearText)?.time                    } catch (_: Exception) { null }
+                        parser.parse(yearText)?.time
+                    } catch (_: Exception) { null }
                 }
             } catch (_: Exception) { null } ?: return@mapNotNull null
             if (millis > now) return@mapNotNull null
@@ -2035,7 +2046,8 @@ private fun loadDashboard(context: android.content.Context): DashboardData {
             val cells = row.select("td")
             if (cells.size < 5) return@mapNotNull null
             val text = row.text().replace(Regex("\\s+"), " ").trim()
-            if (!text.contains("Sunderland", ignoreCase = true)) return@mapNotNull null            val competition = cells.last()?.text()?.trim().orEmpty()
+            if (!text.contains("Sunderland", ignoreCase = true)) return@mapNotNull null
+            val competition = cells.last()?.text()?.trim().orEmpty()
             if (!Regex("(?i)FA Cup|EFL Cup|League Cup|Carabao Cup|Champions League|Europa League|Conference League|UEFA|EFL Trophy").containsMatchIn(competition)) return@mapNotNull null
             val dateText = cells.first()?.text()?.trim().orEmpty()
             if (!Regex("\\b\\d{1,2}\\s+[A-Za-z]{3,9}\\s+20\\d{2}\\b").containsMatchIn(dateText)) return@mapNotNull null
@@ -2494,7 +2506,8 @@ private fun extractFixtureSpecificChannels(url: String, fixture: String?): List<
     }
 }
 
-private fun extractBroadcastersNearFixture(    doc: org.jsoup.nodes.Document,
+private fun extractBroadcastersNearFixture(
+    doc: org.jsoup.nodes.Document,
     anchor: org.jsoup.nodes.Element?,
     fixture: String?
 ): String {
@@ -2508,6 +2521,7 @@ private fun extractBroadcastersNearFixture(    doc: org.jsoup.nodes.Document,
         }
         node = current.parent()
     }
+
     val body = doc.body().text().replace(Regex("\\s+"), " ").trim()
     val candidates = listOfNotNull(
         anchor?.text()?.takeIf { it.isNotBlank() },
@@ -2532,7 +2546,8 @@ private fun fetchKickoffFromGoogle(fixture: String): String? {
         val doc = Jsoup.connect("https://www.google.com/search?q=" + enc(query) + "&num=8")
             .userAgent("Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/124.0 Mobile Safari/537.36")
             .timeout(9000)
-            .get()        doc.select("div.MjjYud").firstNotNullOfOrNull { block ->
+            .get()
+        doc.select("div.MjjYud").firstNotNullOfOrNull { block ->
             val text = listOf(block.selectFirst("h3")?.text().orEmpty(),
                 block.selectFirst("div.VwiC3b, div[data-sncf], span.aCOpRe")?.text().orEmpty(),
                 block.text()).joinToString(" ")
