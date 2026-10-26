@@ -529,7 +529,7 @@ private fun BlackCatApp() {
             bottomBar = {
                 androidx.compose.material3.NavigationBar(containerColor = Color(0xF00C111C), contentColor = Color.White, tonalElevation = 8.dp) {
                     val items = listOf(
-                        Triple("Home", Icons.Filled.Article, 5),
+                        Triple("Home", Icons.Filled.Home, 5),
                         Triple("TV", Icons.Filled.SportsSoccer, 0),
                         Triple("League", Icons.Filled.Public, 1),
                         Triple("Podcasts", Icons.Filled.Headphones, 2),
@@ -791,13 +791,13 @@ private fun BlackCatApp() {
                         }
                         data?.previousFixture?.takeIf { it.isNotBlank() }?.let { previous ->
                             Card(
-                                modifier = Modifier.fillMaxWidth(),
-                                shape = RoundedCornerShape(14.dp),
+                                modifier = Modifier.fillMaxWidth().clickable { selectedTab = 3 },
+                                shape = RoundedCornerShape(16.dp),
                                 colors = CardDefaults.cardColors(containerColor = Color(0x66303D50))
                             ) {
                                 Row(Modifier.fillMaxWidth().padding(13.dp), verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                                    Icon(Icons.Filled.History, contentDescription = null, tint = Muted,
+                                    Icon(Icons.Filled.History, contentDescription = "Open results", tint = Color(0xFFFFA2A8),
                                         modifier = Modifier.size(20.dp))
                                     Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                                         Text("PREVIOUS LEAGUE FIXTURE", color = Muted, fontSize = 9.sp,
@@ -812,13 +812,25 @@ private fun BlackCatApp() {
                         }
                         visibleNewsArticles.firstOrNull()?.let { featured ->
                             Card(
-                                modifier = Modifier.fillMaxWidth(),
-                                shape = RoundedCornerShape(14.dp),
-                                colors = CardDefaults.cardColors(containerColor = Color(0x78352230))
+                                modifier = Modifier.fillMaxWidth().clickable {
+                                    runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(featured.url))) }
+                                },
+                                shape = RoundedCornerShape(16.dp),
+                                colors = CardDefaults.cardColors(containerColor = Color(0x78352230)),
+                                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
                             ) {
-                                Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                                    Text("LATEST HEADLINE", color = Color(0xFFFFA2A8), fontSize = 9.sp,
-                                        fontWeight = FontWeight.ExtraBold, letterSpacing = 1.2.sp)
+                                Column(Modifier.fillMaxWidth().background(
+                                    androidx.compose.ui.graphics.Brush.linearGradient(
+                                        listOf(Color(0xFF35202E), Color(0xFF171B28))
+                                    )
+                                ).padding(14.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
+                                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.SpaceBetween) {
+                                        Text("LATEST HEADLINE", color = Color(0xFFFFA2A8), fontSize = 9.sp,
+                                            fontWeight = FontWeight.ExtraBold, letterSpacing = 1.2.sp)
+                                        Icon(Icons.Filled.OpenInNew, contentDescription = "Read headline",
+                                            tint = Color(0xFFFFA2A8), modifier = Modifier.size(15.dp))
+                                    }
                                     Text(featured.source, color = Muted, fontSize = 10.sp, maxLines = 1,
                                         overflow = TextOverflow.Ellipsis)
                                     Text(featured.title, color = Color.White, fontSize = 14.sp,
