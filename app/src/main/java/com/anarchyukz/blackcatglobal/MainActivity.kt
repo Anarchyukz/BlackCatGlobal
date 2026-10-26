@@ -497,8 +497,7 @@ private fun BlackCatApp() {
     val filteredGuides = remember(data, searchQuery) {
         data?.guides.orEmpty().filter { searchQuery.isBlank() ||
             it.name.contains(searchQuery, true) || it.fixture.orEmpty().contains(searchQuery, true) ||
-            it.context.orEmpty().contains(searchQuery, true) ||            it.channels.any { channel -> channel.contains(searchQuery, true) } }
-    }    // Display only live search results that explicitly identify this fixture.
+            it.context.orEmpty().contains(searchQuery, true) ||            it.channels.any { channel -> channel.contains(searchQuery, true) } }    }    // Display only live search results that explicitly identify this fixture.
     // Unverified regional broadcaster directories are deliberately not presented as listings.
     val filteredSearchResults = remember(worldwideSearchResults, searchQuery) {
         worldwideSearchResults
@@ -997,8 +996,7 @@ private fun BlackCatApp() {
                                 androidx.compose.material3.HorizontalDivider(color = Color(0xFF4B343A))
                                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.SpaceBetween) {                                    Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                                        Text("WORLDWIDE TV", color = Muted, fontSize = 10.sp, letterSpacing = 1.3.sp, fontWeight = FontWeight.Bold)
-                                        Text("${channels.size} channel${if (channels.size == 1) "" else "s"} found", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                                        Text("WORLDWIDE TV", color = Muted, fontSize = 10.sp, letterSpacing = 1.3.sp, fontWeight = FontWeight.Bold)                                        Text("${channels.size} channel${if (channels.size == 1) "" else "s"} found", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 15.sp)
                                     }
                                     androidx.compose.material3.TextButton(onClick = { selectedTab = 0 }) {
                                         Text("View channels  ›", color = Color(0xFFFF8B93), fontWeight = FontWeight.Bold)
@@ -1345,45 +1343,13 @@ private fun BlackCatApp() {
                             if (leagueResults.isNotEmpty()) {
                                 SectionHeader("PREMIER LEAGUE", "League results only")
                                 leagueResults.take(6).forEach { result ->
-                                    Card(
-                                        modifier = Modifier.fillMaxWidth().clickable {
-                                            context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(result.url)))
-                                        },
-                                        shape = RoundedCornerShape(14.dp),
-                                        colors = CardDefaults.cardColors(containerColor = Panel)
-                                    ) {
-                                        Row(Modifier.fillMaxWidth().padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
-                                            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                                                Text(result.fixture, color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                                                Text(result.date, color = Muted, fontSize = 11.sp)
-                                            }
-                                            Text(result.score, color = Color(0xFFFFA2A8), fontSize = 18.sp, fontWeight = FontWeight.ExtraBold)
-                                            Spacer(Modifier.width(10.dp))
-                                            Icon(Icons.Filled.OpenInNew, contentDescription = "Open result source", tint = Muted, modifier = Modifier.size(15.dp))
-                                        }
-                                    }
+                                    ResultScoreCard(result.fixture, result.score, result.date, "PREMIER LEAGUE", result.url)
                                 }
                             }
                             if (cupResults.isNotEmpty()) {
                                 SectionHeader("CUPS & EUROPE", "Kept separate from league results")
                                 cupResults.take(6).forEach { result ->
-                                    Card(
-                                        modifier = Modifier.fillMaxWidth().clickable {
-                                            context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(result.url)))
-                                        },
-                                        shape = RoundedCornerShape(14.dp),
-                                        colors = CardDefaults.cardColors(containerColor = Panel)
-                                    ) {
-                                        Row(Modifier.fillMaxWidth().padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
-                                            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                                                Text(result.fixture, color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                                                Text("${result.competition} · ${result.date}", color = Muted, fontSize = 10.sp, lineHeight = 14.sp)
-                                            }
-                                            Text(result.score, color = Color(0xFFFFA2A8), fontSize = 18.sp, fontWeight = FontWeight.ExtraBold)
-                                            Spacer(Modifier.width(10.dp))
-                                            Icon(Icons.Filled.OpenInNew, contentDescription = "Open result source", tint = Muted, modifier = Modifier.size(15.dp))
-                                        }
-                                    }
+                                    ResultScoreCard(result.fixture, result.score, result.date, result.competition.uppercase(), result.url)
                                 }
                             }
                             Text("Tap a result to open its source. Scorers are shown when supplied by the source; this archive currently provides scores and fixture details.", color = Muted, fontSize = 10.sp, lineHeight = 14.sp)
@@ -1497,8 +1463,7 @@ private fun BlackCatApp() {
                                     updateMessage = null
                                     scope.launch {                                        val result = withContext(Dispatchers.IO) { checkForGitHubUpdate() }
                                         checkingUpdate = false
-                                        updateInfo = result
-                                        updateMessage = when {
+                                        updateInfo = result                                        updateMessage = when {
                                             result == null -> "Couldn't check for updates. Check your internet connection and try again."
                                             result.versionCode > BuildConfig.VERSION_CODE -> null                                            else -> "You're using the latest version."
                                         }
@@ -1735,6 +1700,68 @@ private fun InfoPanel(title: String, body: String) {
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text(title, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
                 Text(body, color = Muted, fontSize = 12.sp, lineHeight = 18.sp)
+            }
+        }
+    }
+}
+
+@Composable
+private fun ResultScoreCard(
+    fixture: String,
+    score: String,
+    date: String,
+    competition: String,
+    url: String
+) {
+    val context = LocalContext.current
+    Card(
+        modifier = Modifier.fillMaxWidth().clickable {
+            context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+        },
+        shape = RoundedCornerShape(22.dp),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF111A29)),
+        elevation = CardDefaults.cardElevation(defaultElevation = 3.dp)
+    ) {
+        Column(
+            Modifier.fillMaxWidth().background(
+                androidx.compose.ui.graphics.Brush.linearGradient(
+                    listOf(Color(0xFF192538), Color(0xFF101722), Color(0xFF17111B))
+                )
+            ).padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    Modifier.background(Color(0x33FF4355), RoundedCornerShape(50))
+                        .padding(horizontal = 10.dp, vertical = 5.dp)
+                ) {
+                    Text(competition, color = Color(0xFFFFA2A8), fontSize = 9.sp,
+                        fontWeight = FontWeight.ExtraBold, letterSpacing = 0.8.sp, maxLines = 1)
+                }
+                Spacer(Modifier.weight(1f))
+                Text(date, color = Muted, fontSize = 10.sp, maxLines = 1,
+                    overflow = TextOverflow.Ellipsis)
+            }
+            FixtureMatchup(fixture)
+            Row(
+                Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center
+            ) {
+                Box(
+                    Modifier.background(
+                        androidx.compose.ui.graphics.Brush.horizontalGradient(
+                            listOf(Color(0xFF4B1725), Color(0xFF812637), Color(0xFF4B1725))
+                        ),
+                        RoundedCornerShape(13.dp)
+                    ).padding(horizontal = 24.dp, vertical = 8.dp)
+                ) {
+                    Text(score, color = Color.White, fontSize = 23.sp, fontWeight = FontWeight.Black,
+                        letterSpacing = 1.2.sp)
+                }
+                Spacer(Modifier.width(10.dp))
+                Icon(Icons.Filled.OpenInNew, contentDescription = "Open result source",
+                    tint = Muted, modifier = Modifier.size(14.dp))
             }
         }
     }
@@ -1997,8 +2024,7 @@ private fun loadDashboard(context: android.content.Context): DashboardData {
             val cells = row.select("td")
             if (cells.size < 5) return@mapNotNull null
             val text = row.text().replace(Regex("\\s+"), " ").trim()
-            if (!text.contains("Sunderland", ignoreCase = true)) return@mapNotNull null
-            val competition = cells.last()?.text()?.trim().orEmpty()
+            if (!text.contains("Sunderland", ignoreCase = true)) return@mapNotNull null            val competition = cells.last()?.text()?.trim().orEmpty()
             if (!Regex("(?i)FA Cup|EFL Cup|League Cup|Carabao Cup|Champions League|Europa League|Conference League|UEFA|EFL Trophy").containsMatchIn(competition)) return@mapNotNull null
             val dateText = cells.first()?.text()?.trim().orEmpty()
             if (!Regex("\\b\\d{1,2}\\s+[A-Za-z]{3,9}\\s+20\\d{2}\\b").containsMatchIn(dateText)) return@mapNotNull null
@@ -2497,8 +2523,7 @@ private fun fetchKickoffFromGoogle(fixture: String): String? {
         val doc = Jsoup.connect("https://www.google.com/search?q=" + enc(query) + "&num=8")
             .userAgent("Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/124.0 Mobile Safari/537.36")
             .timeout(9000)
-            .get()
-        doc.select("div.MjjYud").firstNotNullOfOrNull { block ->
+            .get()        doc.select("div.MjjYud").firstNotNullOfOrNull { block ->
             val text = listOf(block.selectFirst("h3")?.text().orEmpty(),
                 block.selectFirst("div.VwiC3b, div[data-sncf], span.aCOpRe")?.text().orEmpty(),
                 block.text()).joinToString(" ")
