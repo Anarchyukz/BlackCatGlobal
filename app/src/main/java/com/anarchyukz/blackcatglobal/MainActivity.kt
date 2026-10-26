@@ -468,17 +468,12 @@ private fun BlackCatApp() {
         }
     }
 
-    // Restore the previously working TV fallback: combine guide results, targeted
-    // search results and the match-specific fallback list. Keep the last good set
-    // visible if a source temporarily returns an empty response.
+    // Only show channels supported by a fixture-specific guide or a search result
+    // that names both teams. Generic rights directories and guessed regional lists must
+    // never inflate the actual channel count.
     val freshChannels = remember(data, worldwideSearchResults) {
-        val fixture = data?.fixture.orEmpty()
-        val fallbackChannels = if (fixture.isNotBlank()) {
-            curatedBroadcastResults(fixture).flatMap { it.channels }
-        } else emptyList()
         (data?.guides.orEmpty().flatMap { it.channels } +
-            worldwideSearchResults.flatMap { it.channels } +
-            fallbackChannels)
+            worldwideSearchResults.flatMap { it.channels })
             .map { canonicalChannelName(it.trim()) }
             .filter { it.isNotBlank() && !isStreamingPlatformNotChannel(it) }
             .distinctBy { it.lowercase() }
@@ -498,12 +493,10 @@ private fun BlackCatApp() {
             it.context.orEmpty().contains(searchQuery, true) ||
             it.channels.any { channel -> channel.contains(searchQuery, true) } }
     }
-    val regionalFallbackResults = remember(data?.fixture) {
-        data?.fixture?.takeIf { it.contains("Sunderland", true) }
-            ?.let { curatedBroadcastResults(it) }.orEmpty()
-    }
-    val filteredSearchResults = remember(worldwideSearchResults, regionalFallbackResults, searchQuery) {
-        (worldwideSearchResults + regionalFallbackResults)
+    // Display only live search results that explicitly identify this fixture.
+    // Unverified regional broadcaster directories are deliberately not presented as listings.
+    val filteredSearchResults = remember(worldwideSearchResults, searchQuery) {
+        worldwideSearchResults
             .distinctBy { (it.title + "|" + it.region).lowercase() }
             .filter { searchQuery.isBlank() ||
                 it.title.contains(searchQuery, true) || it.snippet.contains(searchQuery, true) ||
@@ -2560,6 +2553,16 @@ private fun worldwideBroadcastDirectory(fixture: String): List<WebResult> {
         )
     }
 }
+private fun fixtureTeamsMentioned(fixture: String, resultText: String): Boolean {
+    val teams = fixture.split(Regex("(?i)\\s+(?:v|vs|versus)\\.?\\s+"))
+        .map { it.replace(Regex("\\s+"), " ").trim().trimEnd('.', ':') }
+        .filter { it.length >= 3 }
+    return teams.size >= 2 && teams.all { team ->
+        Regex("(?i)(?<![\\p{L}\\p{N}])" + Regex.escape(team) + "(?![\\p{L}\\p{N}])")
+            .containsMatchIn(resultText)
+    }
+}
+
 private fun fetchWorldwideSearchResults(fixture: String): List<WebResult> {
     // Search match-specific listings by region, not just general Premier League rights pages.
     // Search areas are labels for the query, not claims that every result is confirmed in that territory.
@@ -2612,9 +2615,14 @@ private fun fetchWorldwideSearchResults(fixture: String): List<WebResult> {
                     val snippet = block.selectFirst("div.VwiC3b, div[data-sncf], span.aCOpRe, div.IsZvec")?.text()?.trim().orEmpty()
                     if (title.isNotBlank()) {
                         val combined = "$title $snippet"
-                        val found = broadcasterTerms.filter { combined.contains(it, ignoreCase = true) }
-                            .distinctBy { it.lowercase() }
-                        local.add(WebResult(title, snippet, "Google", region, found))
+                        // Reject generic rights pages and unrelated matches: both teams must
+                        // be named in the result itself before its channel names are trusted.
+                        if (fixtureTeamsMentioned(fixture, combined)) {
+                            val found = broadcasterTerms.filter { combined.contains(it, ignoreCase = true) }
+                                .distinctBy { it.lowercase() }
+                                .filterNot { isStreamingPlatformNotChannel(it) }
+                            if (found.isNotEmpty()) local.add(WebResult(title, snippet, "Google", region, found))
+                        }
                     }
                 }
             } catch (_: Exception) { }
@@ -2626,9 +2634,12 @@ private fun fetchWorldwideSearchResults(fixture: String): List<WebResult> {
                     val snippet = block.selectFirst("p")?.text()?.trim().orEmpty()
                     if (title.isNotBlank()) {
                         val combined = "$title $snippet"
-                        val found = broadcasterTerms.filter { combined.contains(it, ignoreCase = true) }
-                            .distinctBy { it.lowercase() }
-                        local.add(WebResult(title, snippet, "Bing", region, found))
+                        if (fixtureTeamsMentioned(fixture, combined)) {
+                            val found = broadcasterTerms.filter { combined.contains(it, ignoreCase = true) }
+                                .distinctBy { it.lowercase() }
+                                .filterNot { isStreamingPlatformNotChannel(it) }
+                            if (found.isNotEmpty()) local.add(WebResult(title, snippet, "Bing", region, found))
+                        }
                     }
                 }
             } catch (_: Exception) { }
