@@ -530,7 +530,7 @@ private fun BlackCatApp() {
             bottomBar = {
                 androidx.compose.material3.NavigationBar(containerColor = Panel, contentColor = Color.White) {
                     val items = listOf(
-                        Triple("News", Icons.Filled.Article, 5),
+                        Triple("Home", Icons.Filled.Article, 5),
                         Triple("TV", Icons.Filled.SportsSoccer, 0),
                         Triple("League", Icons.Filled.Public, 1),
                         Triple("Podcasts", Icons.Filled.Headphones, 2),
@@ -703,6 +703,122 @@ private fun BlackCatApp() {
                                 }.sortedByDescending { it.publishedTimestamp }
                                 else -> newsArticles.filter { !isFootballStreamSpam(it) && isSunderlandFootball(it) }
                                     .sortedByDescending { it.publishedTimestamp }
+                            }
+                        }
+                        // Home dashboard: give supporters the next fixture and key destinations immediately.
+                        Text("YOUR SUNDERLAND", color = Color(0xFFFFA2A8), fontWeight = FontWeight.ExtraBold,
+                            fontSize = 11.sp, letterSpacing = 1.8.sp)
+                        Card(
+                            modifier = Modifier.fillMaxWidth().clickable { selectedTab = 0 },
+                            shape = RoundedCornerShape(22.dp),
+                            colors = CardDefaults.cardColors(containerColor = Color(0xA52A1B28))
+                        ) {
+                            Column(
+                                Modifier.fillMaxWidth().background(
+                                    androidx.compose.ui.graphics.Brush.linearGradient(
+                                        listOf(Color(0xB53C1D2A), Color(0x88303C53), Color(0x70202A3A))
+                                    )
+                                ).padding(18.dp),
+                                verticalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween) {
+                                    Text("NEXT SUNDERLAND MATCH", color = Color(0xFFFFA2A8), fontSize = 10.sp,
+                                        fontWeight = FontWeight.ExtraBold, letterSpacing = 1.1.sp)
+                                    Text("TV GUIDE  ›", color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                }
+                                FixtureMatchup(
+                                    fixture = nextSunderlandFixture?.let { scheduled ->
+                                        if (scheduled.venue.equals("Home", true)) "Sunderland vs \${scheduled.opponent}"
+                                        else "\${scheduled.opponent} vs Sunderland"
+                                    } ?: if (fixturesLoading || loading) "Finding the next fixture…" else "Fixture details unavailable"
+                                )
+                                Text(
+                                    listOfNotNull(
+                                        nextSunderlandFixture?.competition?.takeIf { it.isNotBlank() },
+                                        nextSunderlandFixture?.date?.takeIf { it.isNotBlank() }
+                                    ).joinToString("  · ").ifBlank { data?.kickoff ?: "Kick-off details will appear when confirmed" },
+                                    color = Muted, fontSize = 12.sp, lineHeight = 17.sp
+                                )
+                                androidx.compose.material3.HorizontalDivider(color = Color(0x665F3A47))
+                                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween) {
+                                    Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                                        Text("WHERE TO WATCH", color = Muted, fontSize = 9.sp, fontWeight = FontWeight.Bold,
+                                            letterSpacing = 1.sp)
+                                        Text(
+                                            if (channels.isNotEmpty()) "\${channels.size} channel listings found"
+                                            else if (worldwideSearchLoading || loading) "Checking broadcaster listings…"
+                                            else "Broadcast details not confirmed yet",
+                                            color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.SemiBold
+                                        )
+                                    }
+                                    Icon(Icons.Filled.OpenInNew, contentDescription = "Open TV finder",
+                                        tint = Color(0xFFFFA2A8), modifier = Modifier.size(19.dp))
+                                }
+                            }
+                        }
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            listOf(
+                                Triple("TV & CHANNELS", Icons.Filled.SportsSoccer, 0),
+                                Triple("LEAGUE TABLE", Icons.Filled.Public, 1),
+                                Triple("RESULTS", Icons.Filled.History, 3)
+                            ).forEach { shortcut ->
+                                Card(
+                                    modifier = Modifier.weight(1f).clickable { selectedTab = shortcut.third },
+                                    shape = RoundedCornerShape(14.dp),
+                                    colors = CardDefaults.cardColors(containerColor = Color(0x78303D50))
+                                ) {
+                                    Column(
+                                        Modifier.fillMaxWidth().padding(vertical = 13.dp, horizontal = 5.dp),
+                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                        verticalArrangement = Arrangement.spacedBy(7.dp)
+                                    ) {
+                                        Icon(shortcut.second, contentDescription = null, tint = Color(0xFFFFA2A8),
+                                            modifier = Modifier.size(21.dp))
+                                        Text(shortcut.first, color = Color.White, fontSize = 8.sp,
+                                            fontWeight = FontWeight.ExtraBold, maxLines = 2,
+                                            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                                            lineHeight = 10.sp)
+                                    }
+                                }
+                            }
+                        }
+                        data?.previousFixture?.takeIf { it.isNotBlank() }?.let { previous ->
+                            Card(
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(14.dp),
+                                colors = CardDefaults.cardColors(containerColor = Color(0x66303D50))
+                            ) {
+                                Row(Modifier.fillMaxWidth().padding(13.dp), verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                                    Icon(Icons.Filled.History, contentDescription = null, tint = Muted,
+                                        modifier = Modifier.size(20.dp))
+                                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                                        Text("PREVIOUS LEAGUE FIXTURE", color = Muted, fontSize = 9.sp,
+                                            fontWeight = FontWeight.Bold, letterSpacing = 0.8.sp)
+                                        Text(previous, color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                                        data.previousKickoff?.takeIf { it.isNotBlank() }?.let {
+                                            Text(it, color = Muted, fontSize = 10.sp)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        visibleNewsArticles.firstOrNull()?.let { featured ->
+                            Card(
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(14.dp),
+                                colors = CardDefaults.cardColors(containerColor = Color(0x78352230))
+                            ) {
+                                Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                    Text("LATEST HEADLINE", color = Color(0xFFFFA2A8), fontSize = 9.sp,
+                                        fontWeight = FontWeight.ExtraBold, letterSpacing = 1.2.sp)
+                                    Text(featured.source, color = Muted, fontSize = 10.sp, maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis)
+                                    Text(featured.title, color = Color.White, fontSize = 14.sp,
+                                        fontWeight = FontWeight.Bold, lineHeight = 18.sp)
+                                }
                             }
                         }
                         Row(
