@@ -19,20 +19,30 @@ internal data class LeagueTableTeam(
  * Return an empty list only when neither source yields a credible 20-team PL table.
  */
 internal fun loadPremierLeagueTable(): List<LeagueTableTeam> {
-    val espn = runCatching {
-        val body = Jsoup.connect("https://site.api.espn.com/apis/site/v2/sports/soccer/eng.1/standings")
-            .userAgent("BlackCatGlobal/1.0 (Android)")
-            .timeout(15000)
-            .ignoreContentType(true)
-            .execute().body()
-        val root = JSONObject(body)
-        val entries = mutableListOf<JSONObject>()
-        collectStandingEntries(root, entries)
-        entries.mapIndexedNotNull { index, entry -> parseEspnEntry(entry, index + 1) }
-            .distinctBy { it.name }
-            .sortedBy { it.position }
-            .takeIf { it.size >= 15 && it.any { team -> team.name.contains("Sunderland", true) } }
-    }.getOrNull()
+    // Soccer standings live under ESPN's /apis/v2/ route. The /apis/site/v2/
+    // route is only a stub for this endpoint and can return no table at all.
+    val espnUrls = listOf(
+        "https://site.api.espn.com/apis/v2/sports/soccer/eng.1/standings",
+        "https://site.web.api.espn.com/apis/v2/sports/soccer/eng.1/standings"
+    )
+    val espn = espnUrls.firstNotNullOfOrNull { url ->
+        runCatching {
+            val body = Jsoup.connect(url)
+                .userAgent("BlackCatGlobal/1.0 (Android)")
+                .timeout(15000)
+                .ignoreContentType(true)
+                .execute().body()
+            val root = JSONObject(body)
+            val entries = mutableListOf<JSONObject>()
+            collectStandingEntries(root, entries)
+            entries.mapIndexedNotNull { index, entry -> parseEspnEntry(entry, index + 1) }
+                .distinctBy { it.name }
+                .sortedBy { it.position }
+                .takeIf { table ->
+                    table.size >= 15 && table.any { team -> team.name.contains("Sunderland", true) }
+                }
+        }.getOrNull()?.takeIf { it.isNotEmpty() }
+    }
     if (!espn.isNullOrEmpty()) return espn
 
     val sky = runCatching {
