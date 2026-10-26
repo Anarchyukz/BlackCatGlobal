@@ -164,7 +164,7 @@ private fun parseSunderlandFixture(element: Element, source: String, now: Long, 
     return SunderlandFixture(dateLabel, opponent, competition, if (home) "Home" else "Away", millis, url)
 }
 
-/** A completed Sunderland match, with its competition and source kept alongside the score. */
+/** A completed match parsed from a result row, without guessed score fallbacks. */
 internal data class SunderlandMatchResult(
     val date: String,
     val fixture: String,
@@ -174,77 +174,76 @@ internal data class SunderlandMatchResult(
     val url: String
 )
 
-/**
- * Read completed matches from 11v11's league fixture page and full match archive.
- * Keep competition on each result so league and cup/European games can be displayed separately.
- */
+/** Results-only parser, independent of the upcoming-fixture parser and cached dashboard strings. */
 internal fun loadSunderlandResults(): List<SunderlandMatchResult> {
     val sources = listOf(
         "https://www.11v11.com/teams/sunderland/option/fixtures/",
-        "https://www.11v11.com/teams/sunderland/tab/matches/"
+        "https://www.skysports.com/sunderland-scores-fixtures"
     )
     val london = TimeZone.getTimeZone("Europe/London")
     val now = System.currentTimeMillis()
-    val datePatterns = listOf("d MMMM yyyy", "d MMM yyyy", "d MMMM", "d MMM")
-    val results = sources.flatMap { source ->
-        runCatching {
-            val doc = Jsoup.connect(source)
+    val currentYear = java.util.Calendar.getInstance(london).get(java.util.Calendar.YEAR)
+    val results = mutableListOf<SunderlandMatchResult>()
+
+    for (source in sources) {
+        val doc = runCatching {
+            Jsoup.connect(source)
                 .userAgent("Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/124.0 Mobile Safari/537.36")
-                .timeout(12000)
+                .timeout(15000)
                 .get()
-            doc.select("tr").mapNotNull { row ->
-                val cells = row.select("td")
-                if (cells.size < 4) return@mapNotNull null
-                val rowText = row.text().replace(Regex("\\s+"), " ").trim()
-                if (!rowText.contains("Sunderland", true)) return@mapNotNull null
-                val dateText = cells.firstOrNull()?.text()?.trim().orEmpty()
-                val dateMatch = Regex("(?i)\\b\\d{1,2}\\s+[A-Za-z]{3,9}(?:\\s+20\\d{2})?\\b").find(dateText)
-                    ?: return@mapNotNull null
-                val rawDate = dateMatch.value
-                val dateWithYear = if (Regex("\\b20\\d{2}\\b").containsMatchIn(rawDate)) rawDate else "$rawDate 2026"
-                val millis = datePatterns.firstNotNullOfOrNull { pattern ->
-                    runCatching {
-                        SimpleDateFormat(pattern, Locale.UK).apply {
-                            timeZone = london
-                            isLenient = false
-                        }.parse(dateWithYear)?.time
-                    }.getOrNull()
-                } ?: return@mapNotNull null
-                if (millis > now || millis < now - 370L * 24L * 60L * 60L * 1000L) return@mapNotNull null
-                val scoreCell = cells.getOrNull(3)?.text()?.trim().orEmpty()
-                val scoreMatch = Regex("\\b(\\d{1,2})\\s*[-–:]\\s*(\\d{1,2})\\b").find(scoreCell)
-                    ?: Regex("\\b(\\d{1,2})\\s*[-–:]\\s*(\\d{1,2})\\b").find(rowText)
-                    ?: return@mapNotNull null
-                val score = "${scoreMatch.groupValues[1]}–${scoreMatch.groupValues[2]}"
-                val fixtureCell = cells.getOrNull(1)?.text()?.replace(Regex("\\s+"), " ")?.trim().orEmpty()
-                val fixture = fixtureCell.takeIf { it.contains("Sunderland", true) }
-                    ?: rowText.substringAfter(rawDate).replace(scoreMatch.value, "").trim()
-                if (fixture.isBlank()) return@mapNotNull null
-                val competitionText = cells.lastOrNull()?.text()?.trim().orEmpty()
-                val competition = when {
-                    Regex("(?i)Europa League").containsMatchIn(competitionText) -> "UEFA Europa League"
-                    Regex("(?i)Conference League").containsMatchIn(competitionText) -> "UEFA Conference League"
-                    Regex("(?i)Champions League").containsMatchIn(competitionText) -> "UEFA Champions League"
-                    Regex("(?i)FA Cup").containsMatchIn(competitionText) -> "FA Cup"
-                    Regex("(?i)EFL Cup|League Cup|Carabao").containsMatchIn(competitionText) -> "EFL Cup"
-                    Regex("(?i)EFL Trophy").containsMatchIn(competitionText) -> "EFL Trophy"
-                    Regex("(?i)Premier League").containsMatchIn(competitionText) -> "Premier League"
-                    else -> competitionText.ifBlank { "Sunderland match" }
-                }
-                val link = row.selectFirst("a[href]")
-                val url = link?.absUrl("href")?.takeIf { it.startsWith("https://") } ?: source
-                SunderlandMatchResult(
-                    date = SimpleDateFormat("EEE d MMM yyyy", Locale.UK).apply { timeZone = london }.format(Date(millis)),
-                    fixture = fixture,
-                    score = score,
-                    competition = competition,
-                    sortTime = millis,
-                    url = url
-                )
+        }.getOrNull() ?: continue
+
+        for (row in doc.select("tr, article, [class*=fixture], [class*=match], [data-testid*=match]")) {
+            val text = row.text().replace(Regex("\\s+"), " ").trim()
+            if (!text.contains("Sunderland", true)) continue
+            val scoreMatch = Regex("(?<!\\d)(\\d{1,2})\\s*[-–:]\\s*(\\d{1,2})(?!\\d)").find(text) ?: continue
+            val dateMatch = Regex("(?i)\\b(\\d{1,2})(?:st|nd|rd|th)?\\s+(Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)(?:\\s+(20\\d{2}))?\\b").find(text) ?: continue
+            val day = dateMatch.groupValues[1].toIntOrNull() ?: continue
+            val month = dateMatch.groupValues[2].take(3)
+            var year = dateMatch.groupValues[3].toIntOrNull() ?: currentYear
+            fun dateMillis(y: Int): Long? = runCatching {
+                SimpleDateFormat("d MMM yyyy", Locale.UK).apply {
+                    timeZone = london
+                    isLenient = false
+                }.parse("$day $month $y")?.time
+            }.getOrNull()
+            var millis = dateMillis(year) ?: continue
+            if (dateMatch.groupValues[3].isBlank() && millis > now + 30L * 24L * 60L * 60L * 1000L) {
+                year--
+                millis = dateMillis(year) ?: continue
             }
-        }.getOrDefault(emptyList())
+            if (millis > now + 2L * 60L * 60L * 1000L || millis < now - 370L * 24L * 60L * 60L * 1000L) continue
+
+            val cells = row.select("td, th").map { it.text().replace(Regex("\\s+"), " ").trim() }.filter { it.isNotBlank() }
+            val matchupPattern = Regex("(?i)(?:Sunderland(?: AFC)?\\s+(?:v|vs\\.?|versus)\\s+[^|]+|[^|]+?\\s+(?:v|vs\\.?|versus)\\s+Sunderland(?: AFC)?)")
+            val fixture = cells.firstOrNull { it.contains("Sunderland", true) && matchupPattern.containsMatchIn(it) }
+                ?: matchupPattern.find(text.replace(scoreMatch.value, " "))?.value?.trim()
+                ?: continue
+            val competitionText = cells.firstOrNull {
+                Regex("(?i)Premier League|Europa League|Conference League|Champions League|FA Cup|EFL Cup|League Cup|Carabao|EFL Trophy").containsMatchIn(it)
+            } ?: text
+            val competition = when {
+                Regex("(?i)Europa League").containsMatchIn(competitionText) -> "UEFA Europa League"
+                Regex("(?i)Conference League").containsMatchIn(competitionText) -> "UEFA Conference League"
+                Regex("(?i)Champions League").containsMatchIn(competitionText) -> "UEFA Champions League"
+                Regex("(?i)FA Cup").containsMatchIn(competitionText) -> "FA Cup"
+                Regex("(?i)EFL Cup|League Cup|Carabao").containsMatchIn(competitionText) -> "EFL Cup"
+                Regex("(?i)EFL Trophy").containsMatchIn(competitionText) -> "EFL Trophy"
+                Regex("(?i)Premier League|\\bPREM\\b").containsMatchIn(competitionText) -> "Premier League"
+                else -> "Other competition"
+            }
+            val link = row.selectFirst("a[href]")
+            results += SunderlandMatchResult(
+                date = SimpleDateFormat("EEE d MMM yyyy", Locale.UK).apply { timeZone = london }.format(Date(millis)),
+                fixture = fixture.replace(Regex("\\s+"), " ").trim(),
+                score = scoreMatch.groupValues[1] + "–" + scoreMatch.groupValues[2],
+                competition = competition,
+                sortTime = millis,
+                url = link?.absUrl("href")?.takeIf { it.startsWith("https://") } ?: source
+            )
+        }
     }
-    return results.distinctBy { "${it.sortTime / 86_400_000L}|${it.fixture.lowercase(Locale.UK)}|${it.score}" }
+    return results.distinctBy { (it.sortTime / 86_400_000L).toString() + "|" + it.fixture.lowercase(Locale.UK) + "|" + it.score }
         .sortedByDescending { it.sortTime }
-        .take(12)
+        .take(20)
 }
