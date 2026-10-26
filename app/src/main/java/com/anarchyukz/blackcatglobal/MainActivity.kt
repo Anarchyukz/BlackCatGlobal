@@ -497,8 +497,7 @@ private fun BlackCatApp() {
     val filteredGuides = remember(data, searchQuery) {
         data?.guides.orEmpty().filter { searchQuery.isBlank() ||
             it.name.contains(searchQuery, true) || it.fixture.orEmpty().contains(searchQuery, true) ||
-            it.context.orEmpty().contains(searchQuery, true) ||            it.channels.any { channel -> channel.contains(searchQuery, true) } }    }    // Display only live search results that explicitly identify this fixture.
-    // Unverified regional broadcaster directories are deliberately not presented as listings.
+            it.context.orEmpty().contains(searchQuery, true) ||            it.channels.any { channel -> channel.contains(searchQuery, true) } }    }    // Display only live search results that explicitly identify this fixture.    // Unverified regional broadcaster directories are deliberately not presented as listings.
     val filteredSearchResults = remember(worldwideSearchResults, searchQuery) {
         worldwideSearchResults
             .distinctBy { (it.title + "|" + it.region).lowercase() }
@@ -895,10 +894,18 @@ private fun BlackCatApp() {
                                             context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(article.url)))
                                         }
                                     },
-                                    shape = RoundedCornerShape(16.dp),
-                                    colors = CardDefaults.cardColors(containerColor = Panel)
+                                    shape = RoundedCornerShape(20.dp),
+                                    colors = CardDefaults.cardColors(containerColor = Color(0xFF111A29)),
+                                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
                                 ) {
-                                    Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    Column(
+                                        Modifier.fillMaxWidth()
+                                            .background(androidx.compose.ui.graphics.Brush.linearGradient(
+                                                listOf(Color(0xFF172235), Color(0xFF101620))
+                                            ))
+                                            .padding(13.dp),
+                                        verticalArrangement = Arrangement.spacedBy(9.dp)
+                                    ) {
                                         Row(
                                             modifier = Modifier.fillMaxWidth(),
                                             horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -908,7 +915,7 @@ private fun BlackCatApp() {
                                                 AsyncImage(
                                                     model = imageUrl,
                                                     contentDescription = article.title,
-                                                    modifier = Modifier.width(112.dp).height(84.dp),
+                                                    modifier = Modifier.width(112.dp).height(84.dp).clip(RoundedCornerShape(13.dp)),
                                                     contentScale = ContentScale.Crop
                                                 )
                                             }
@@ -997,8 +1004,7 @@ private fun BlackCatApp() {
                                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.SpaceBetween) {                                    Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
                                         Text("WORLDWIDE TV", color = Muted, fontSize = 10.sp, letterSpacing = 1.3.sp, fontWeight = FontWeight.Bold)                                        Text("${channels.size} channel${if (channels.size == 1) "" else "s"} found", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 15.sp)
-                                    }
-                                    androidx.compose.material3.TextButton(onClick = { selectedTab = 0 }) {
+                                    }                                    androidx.compose.material3.TextButton(onClick = { selectedTab = 0 }) {
                                         Text("View channels  ›", color = Color(0xFFFF8B93), fontWeight = FontWeight.Bold)
                                     }                                }
                             }
@@ -1497,8 +1503,7 @@ private fun BlackCatApp() {
             confirmButton = {
                 TextButton(onClick = {
                     val url = updateInfo!!.downloadUrl
-                    updateInfo = null
-                    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+                    updateInfo = null                    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
                 }) { Text("Download update") }
             },
             dismissButton = { TextButton(onClick = { updateInfo = null }) { Text("Not now") } }
@@ -1843,12 +1848,22 @@ private fun ChannelRow(channel: String, number: Int) {
             "https://commons.wikimedia.org/wiki/Special:FilePath/SuperSport_logo.svg"
         else -> null
     }
-    Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = Color(0xFF111820))) {
-        Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
-            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+    Card(
+        Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(18.dp),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF111A29)),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Row(
+            Modifier.fillMaxWidth()
+                .background(androidx.compose.ui.graphics.Brush.linearGradient(
+                    listOf(Color(0xFF172235), Color(0xFF101722))
+                ))
+                .padding(horizontal = 13.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)
+       ) {
             var logoFailed by remember(logoUrl) { mutableStateOf(false) }
-            Box(Modifier.size(width = 92.dp, height = 48.dp).background(Color.White, RoundedCornerShape(5.dp)).padding(4.dp),
+            Box(Modifier.size(width = 92.dp, height = 48.dp).background(Color.White, RoundedCornerShape(9.dp)).padding(5.dp),
                 contentAlignment = Alignment.Center) {
                 if (logoUrl != null && !logoFailed) {
                     AsyncImage(
@@ -1997,8 +2012,7 @@ private fun loadDashboard(context: android.content.Context): DashboardData {
                     try {
                         val parser = java.text.SimpleDateFormat(pattern, java.util.Locale.UK)
                         parser.isLenient = false
-                        parser.parse(yearText)?.time
-                    } catch (_: Exception) { null }
+                        parser.parse(yearText)?.time                    } catch (_: Exception) { null }
                 }
             } catch (_: Exception) { null } ?: return@mapNotNull null
             if (millis > now) return@mapNotNull null
@@ -2498,7 +2512,6 @@ private fun extractBroadcastersNearFixture(
         }
         node = current.parent()
     }
-
     val body = doc.body().text().replace(Regex("\\s+"), " ").trim()
     val candidates = listOfNotNull(
         anchor?.text()?.takeIf { it.isNotBlank() },
