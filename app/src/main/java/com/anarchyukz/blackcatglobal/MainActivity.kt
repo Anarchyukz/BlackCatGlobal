@@ -497,8 +497,7 @@ private fun BlackCatApp() {
     val filteredGuides = remember(data, searchQuery) {
         data?.guides.orEmpty().filter { searchQuery.isBlank() ||
             it.name.contains(searchQuery, true) || it.fixture.orEmpty().contains(searchQuery, true) ||
-            it.context.orEmpty().contains(searchQuery, true) ||
-            it.channels.any { channel -> channel.contains(searchQuery, true) } }
+            it.context.orEmpty().contains(searchQuery, true) ||            it.channels.any { channel -> channel.contains(searchQuery, true) } }
     }    // Display only live search results that explicitly identify this fixture.
     // Unverified regional broadcaster directories are deliberately not presented as listings.
     val filteredSearchResults = remember(worldwideSearchResults, searchQuery) {
@@ -997,8 +996,7 @@ private fun BlackCatApp() {
                                 }
                                 androidx.compose.material3.HorizontalDivider(color = Color(0xFF4B343A))
                                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.SpaceBetween) {
-                                    Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                                    horizontalArrangement = Arrangement.SpaceBetween) {                                    Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
                                         Text("WORLDWIDE TV", color = Muted, fontSize = 10.sp, letterSpacing = 1.3.sp, fontWeight = FontWeight.Bold)
                                         Text("${channels.size} channel${if (channels.size == 1) "" else "s"} found", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 15.sp)
                                     }
@@ -1497,8 +1495,7 @@ private fun BlackCatApp() {
                                 if (!checkingUpdate) {
                                     checkingUpdate = true
                                     updateMessage = null
-                                    scope.launch {
-                                        val result = withContext(Dispatchers.IO) { checkForGitHubUpdate() }
+                                    scope.launch {                                        val result = withContext(Dispatchers.IO) { checkForGitHubUpdate() }
                                         checkingUpdate = false
                                         updateInfo = result
                                         updateMessage = when {
@@ -1687,18 +1684,58 @@ private fun TeamCrest(url: String?, teamName: String, modifier: Modifier = Modif
 
 @Composable
 private fun SectionHeader(title: String, subtitle: String? = null) {
-    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Text(title, color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 0.8.sp)
-        if (!subtitle.isNullOrBlank()) Text(subtitle, color = Muted, fontSize = 11.sp, lineHeight = 15.sp)
+    Row(
+        Modifier.fillMaxWidth().padding(top = 3.dp, bottom = 2.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(11.dp)
+    ) {
+        Box(
+            Modifier.width(4.dp).height(if (subtitle.isNullOrBlank()) 24.dp else 34.dp)
+                .background(
+                    androidx.compose.ui.graphics.Brush.verticalGradient(
+                        listOf(CatRed, Color(0xFF7E2439))
+                    ),
+                    RoundedCornerShape(50)
+                )
+        )
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(title, color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.ExtraBold,
+                letterSpacing = 1.05.sp, lineHeight = 18.sp)
+            if (!subtitle.isNullOrBlank()) Text(subtitle, color = Muted, fontSize = 11.sp, lineHeight = 15.sp)
+        }
     }
 }
 
 @Composable
 private fun InfoPanel(title: String, body: String) {
-    Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = Panel)) {
-        Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Text(title, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 15.sp)
-            Text(body, color = Muted, fontSize = 12.sp, lineHeight = 18.sp)
+    Card(
+        Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF111A29)),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Row(
+            Modifier.fillMaxWidth()
+                .background(
+                    androidx.compose.ui.graphics.Brush.linearGradient(
+                        listOf(Color(0xFF172234), Color(0xFF111620))
+                    )
+                )
+                .padding(17.dp),
+            verticalAlignment = Alignment.Top,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Box(
+                Modifier.size(34.dp).background(Color(0x332E9BFF), RoundedCornerShape(12.dp)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(Icons.Filled.Public, contentDescription = null, tint = Color(0xFF82BFFF),
+                    modifier = Modifier.size(18.dp))
+            }
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text(title, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                Text(body, color = Muted, fontSize = 12.sp, lineHeight = 18.sp)
+            }
         }
     }
 }
@@ -1997,8 +2034,7 @@ private fun loadDashboard(context: android.content.Context): DashboardData {
     // Repair older saved fallback data when a results source is temporarily unavailable.
     // The app may already have cached the 10 October Brighton result from an earlier version.
     val latestKnownResultMillis = runCatching {
-        java.text.SimpleDateFormat("d MMM yyyy", java.util.Locale.UK).parse("25 Oct 2026")?.time
-    }.getOrNull() ?: 0L
+        java.text.SimpleDateFormat("d MMM yyyy", java.util.Locale.UK).parse("25 Oct 2026")?.time    }.getOrNull() ?: 0L
     val savedResultMillis = parseKickoffMillis(previousKickoff.orEmpty()) ?: 0L
     if (now >= latestKnownResultMillis &&
         savedResultMillis < latestKnownResultMillis &&
@@ -2497,8 +2533,7 @@ private fun curatedBroadcastResults(fixture: String): List<WebResult> {
     if (!hasBournemouth) return worldwideBroadcastDirectory(fixture)
 
     val matchLabel = "Bournemouth v Sunderland"
-    // Match-specific channel names from international fixture listings. Streaming apps are
-    // retained where no separate linear channel was specified; availability must be checked locally.
+    // Match-specific channel names from international fixture listings. Streaming apps are    // retained where no separate linear channel was specified; availability must be checked locally.
     val broadcasts = listOf(
         "United Kingdom" to listOf("Sky Sports+"),
         "Ireland" to listOf("Sky Sports+"),        "United States" to listOf("NBCSN", "Peacock"),
