@@ -196,7 +196,7 @@ internal fun loadSunderlandResults(): List<SunderlandMatchResult> {
         for (row in doc.select("tr, article, [class*=fixture], [class*=match], [data-testid*=match]")) {
             val text = row.text().replace(Regex("\\s+"), " ").trim()
             if (!text.contains("Sunderland", true)) continue
-            val scoreMatch = Regex("(?<!\\d)(\\d{1,2})\\s*[-–:]\\s*(\\d{1,2})(?!\\d)").find(text) ?: continue
+            val scoreMatch = Regex("(?<!\\d)(\\d{1,2})\\s*[-–]\\s*(\\d{1,2})(?!\\d)").find(text) ?: continue
             val dateMatch = Regex("(?i)\\b(\\d{1,2})(?:st|nd|rd|th)?\\s+(Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)(?:\\s+(20\\d{2}))?\\b").find(text) ?: continue
             val day = dateMatch.groupValues[1].toIntOrNull() ?: continue
             val month = dateMatch.groupValues[2].take(3)
