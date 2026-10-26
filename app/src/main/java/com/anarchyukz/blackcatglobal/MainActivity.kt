@@ -1950,9 +1950,24 @@ private fun loadDashboard(context: android.content.Context): DashboardData {
         // Keep the last saved result if the results site is temporarily unavailable.
     }
     if (previousFixture.isNullOrBlank()) {
-        // Safe first-launch fallback for the latest completed Sunderland match as of 15 Oct 2026.
-        previousFixture = "Sunderland 0–2 Brighton"
-        previousKickoff = "Sat 10 Oct"
+        // Safe first-launch fallback for the latest completed Sunderland match as of 26 Oct 2026.
+        previousFixture = "Sunderland 0–0 Leeds United"
+        previousKickoff = "Sun 25 Oct"
+        prefs.edit().putString("previous_fixture", previousFixture)
+            .putString("previous_kickoff_label", previousKickoff).apply()
+    }
+
+    // Repair older saved fallback data when a results source is temporarily unavailable.
+    // The app may already have cached the 10 October Brighton result from an earlier version.
+    val latestKnownResultMillis = runCatching {
+        java.text.SimpleDateFormat("d MMM yyyy", java.util.Locale.UK).parse("25 Oct 2026")?.time
+    }.getOrNull() ?: 0L
+    val savedResultMillis = parseKickoffMillis(previousKickoff.orEmpty()) ?: 0L
+    if (now >= latestKnownResultMillis &&
+        savedResultMillis < latestKnownResultMillis &&
+        previousFixture.orEmpty().contains("Brighton", ignoreCase = true)) {
+        previousFixture = "Sunderland 0–0 Leeds United"
+        previousKickoff = "Sun 25 Oct"
         prefs.edit().putString("previous_fixture", previousFixture)
             .putString("previous_kickoff_label", previousKickoff).apply()
     }
