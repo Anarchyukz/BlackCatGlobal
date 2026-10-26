@@ -169,10 +169,10 @@ private suspend fun loadPodcastEpisodes(feed: PodcastFeed): List<PodcastEpisode>
     }.getOrDefault(emptyList())
 }
 
-private val CatRed = Color(0xFFE53945)
-private val DeepBackground = Color.Transparent
-private val Panel = Color(0x801B2636)
-private val Muted = Color(0xFFB7BAC3)
+private val CatRed = Color(0xFFFF4355)
+private val DeepBackground = Color(0xFF080B12)
+private val Panel = Color(0xF0111724)
+private val Muted = Color(0xFFAAB5C7)
 
 @Composable
 private fun BlackCatAppWithSplash() {
@@ -184,7 +184,7 @@ private fun BlackCatAppWithSplash() {
     Box(
         Modifier.fillMaxSize().background(
             androidx.compose.ui.graphics.Brush.linearGradient(
-                listOf(Color(0xFF17283D), Color(0xFF090D17), Color(0xFF291927), Color(0xFF101A2B))
+                listOf(Color(0xFF070A11), Color(0xFF101827), Color(0xFF21111C), Color(0xFF080B12))
             )
         )
     ) {
@@ -298,8 +298,10 @@ class MainActivity : ComponentActivity() {
             MaterialTheme(colorScheme = darkColorScheme(
                 primary = CatRed,
                 onPrimary = Color.White,
+                secondary = Color(0xFFFFA2A8),
                 background = DeepBackground,
                 surface = Panel,
+                surfaceVariant = Color(0xFF171F2E),
                 onSurface = Color.White
             )) {
                 BlackCatAppWithSplash()
@@ -497,8 +499,7 @@ private fun BlackCatApp() {
             it.name.contains(searchQuery, true) || it.fixture.orEmpty().contains(searchQuery, true) ||
             it.context.orEmpty().contains(searchQuery, true) ||
             it.channels.any { channel -> channel.contains(searchQuery, true) } }
-    }
-    // Display only live search results that explicitly identify this fixture.
+    }    // Display only live search results that explicitly identify this fixture.
     // Unverified regional broadcaster directories are deliberately not presented as listings.
     val filteredSearchResults = remember(worldwideSearchResults, searchQuery) {
         worldwideSearchResults
@@ -521,12 +522,12 @@ private fun BlackCatApp() {
         }
     }
 
-    Surface(Modifier.fillMaxSize(), color = Color.Transparent) {
+    Surface(Modifier.fillMaxSize(), color = DeepBackground) {
         androidx.compose.material3.Scaffold(
             modifier = Modifier.fillMaxSize().statusBarsPadding(),
-            containerColor = Color.Transparent,
+            containerColor = DeepBackground,
             bottomBar = {
-                androidx.compose.material3.NavigationBar(containerColor = Panel, contentColor = Color.White) {
+                androidx.compose.material3.NavigationBar(containerColor = Color(0xF00C111C), contentColor = Color.White, tonalElevation = 8.dp) {
                     val items = listOf(
                         Triple("Home", Icons.Filled.Article, 5),
                         Triple("TV", Icons.Filled.SportsSoccer, 0),
@@ -552,17 +553,23 @@ private fun BlackCatApp() {
             }
         ) { scaffoldPadding ->
             Column(
-                modifier = Modifier.fillMaxSize().padding(scaffoldPadding)
+                modifier = Modifier.fillMaxSize()
+                    .background(androidx.compose.ui.graphics.Brush.linearGradient(
+                        listOf(Color(0xFF080B12), Color(0xFF101827), Color(0xFF160E18), Color(0xFF080B12))
+                    ))
+                    .padding(scaffoldPadding)
                     .verticalScroll(rememberScrollState()).padding(horizontal = 18.dp, vertical = 14.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
+                Row(Modifier.fillMaxWidth().background(Color(0x99121A28), RoundedCornerShape(20.dp))
+                    .padding(horizontal = 12.dp, vertical = 9.dp),
+                    verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween) {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                         Image(
                             painter = painterResource(id = R.drawable.bcg),
                             contentDescription = "BlackCat Global logo",
-                            modifier = Modifier.size(46.dp),
+                            modifier = Modifier.size(44.dp),
                             contentScale = ContentScale.Crop
                         )
                         Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
@@ -997,8 +1004,7 @@ private fun BlackCatApp() {
                                     }
                                     androidx.compose.material3.TextButton(onClick = { selectedTab = 0 }) {
                                         Text("View channels  ›", color = Color(0xFFFF8B93), fontWeight = FontWeight.Bold)
-                                    }
-                                }
+                                    }                                }
                             }
                         }
                         SectionHeader("BROADCAST SNAPSHOT", "Names found in public listings and web results")
@@ -1497,8 +1503,7 @@ private fun BlackCatApp() {
                                         updateInfo = result
                                         updateMessage = when {
                                             result == null -> "Couldn't check for updates. Check your internet connection and try again."
-                                            result.versionCode > BuildConfig.VERSION_CODE -> null
-                                            else -> "You're using the latest version."
+                                            result.versionCode > BuildConfig.VERSION_CODE -> null                                            else -> "You're using the latest version."
                                         }
                                         FirebaseAnalytics.getInstance(context).logEvent("update_check", Bundle().apply {
                                             putBoolean("update_available", result != null && result.versionCode > BuildConfig.VERSION_CODE)
@@ -1997,8 +2002,7 @@ private fun loadDashboard(context: android.content.Context): DashboardData {
     val savedResultMillis = parseKickoffMillis(previousKickoff.orEmpty()) ?: 0L
     if (now >= latestKnownResultMillis &&
         savedResultMillis < latestKnownResultMillis &&
-        previousFixture.orEmpty().contains("Brighton", ignoreCase = true)) {
-        previousFixture = "Sunderland 0–0 Leeds United"
+        previousFixture.orEmpty().contains("Brighton", ignoreCase = true)) {        previousFixture = "Sunderland 0–0 Leeds United"
         previousKickoff = "Sun 25 Oct"
         prefs.edit().putString("previous_fixture", previousFixture)
             .putString("previous_kickoff_label", previousKickoff).apply()
@@ -2497,8 +2501,7 @@ private fun curatedBroadcastResults(fixture: String): List<WebResult> {
     // retained where no separate linear channel was specified; availability must be checked locally.
     val broadcasts = listOf(
         "United Kingdom" to listOf("Sky Sports+"),
-        "Ireland" to listOf("Sky Sports+"),
-        "United States" to listOf("NBCSN", "Peacock"),
+        "Ireland" to listOf("Sky Sports+"),        "United States" to listOf("NBCSN", "Peacock"),
         "Canada" to listOf("DAZN Canada", "FuboTV Canada"),
         "Caribbean" to listOf("Disney+ Premium Caribbean"),
         "Argentina" to listOf("Disney+ Premium Argentina"),
