@@ -529,7 +529,7 @@ private fun BlackCatApp() {
             bottomBar = {
                 androidx.compose.material3.NavigationBar(containerColor = Color(0xF00C111C), contentColor = Color.White, tonalElevation = 8.dp) {
                     val items = listOf(
-                        Triple("Home", Icons.Filled.Home, 5),
+                        Triple("Home", Icons.Filled.Article, 5),
                         Triple("TV", Icons.Filled.SportsSoccer, 0),
                         Triple("League", Icons.Filled.Public, 1),
                         Triple("Podcasts", Icons.Filled.Headphones, 2),
