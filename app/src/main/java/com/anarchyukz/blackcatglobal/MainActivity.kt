@@ -336,6 +336,7 @@ private fun BlackCatApp() {
     var leagueRefreshToken by remember { mutableIntStateOf(0) }
     var fixturesLoading by remember { mutableStateOf(true) }
     var upcomingFixtures by remember { mutableStateOf<List<SunderlandFixture>>(emptyList()) }
+    var recentResults by remember { mutableStateOf<List<SunderlandMatchResult>>(emptyList()) }
     var worldwideSearchResults by remember { mutableStateOf<List<WebResult>>(emptyList()) }
     var worldwideSearchLoading by remember { mutableStateOf(false) }
     var lineupTeams by remember { mutableStateOf<List<LineupTeam>>(emptyList()) }
@@ -381,25 +382,29 @@ private fun BlackCatApp() {
         leagueLoading = true
         fixturesLoading = true
         val initial = withContext(Dispatchers.IO) {
-            Pair(
+            Triple(
                 runCatching { loadPremierLeagueTable() }.getOrDefault(emptyList()),
-                runCatching { loadSunderlandFixtures() }.getOrDefault(emptyList())
+                runCatching { loadSunderlandFixtures() }.getOrDefault(emptyList()),
+                runCatching { loadSunderlandResults() }.getOrDefault(emptyList())
             )
         }
         if (initial.first.isNotEmpty()) leagueTeams = initial.first
         if (initial.second.isNotEmpty()) upcomingFixtures = initial.second
+        if (initial.third.isNotEmpty()) recentResults = initial.third
         leagueLoading = false
         fixturesLoading = false
         while (true) {
             kotlinx.coroutines.delay(5 * 60_000L)
             val refreshed = withContext(Dispatchers.IO) {
-                Pair(
+                Triple(
                     runCatching { loadPremierLeagueTable() }.getOrDefault(emptyList()),
-                    runCatching { loadSunderlandFixtures() }.getOrDefault(emptyList())
+                    runCatching { loadSunderlandFixtures() }.getOrDefault(emptyList()),
+                    runCatching { loadSunderlandResults() }.getOrDefault(emptyList())
                 )
             }
             if (refreshed.first.isNotEmpty()) leagueTeams = refreshed.first
             if (refreshed.second.isNotEmpty()) upcomingFixtures = refreshed.second
+            if (refreshed.third.isNotEmpty()) recentResults = refreshed.third
         }
     }
 
@@ -1324,27 +1329,61 @@ private fun BlackCatApp() {
                         Text("Audio streams directly in BlackCat Global. You can leave the tab and use Android's media controls while listening.", color = Muted, fontSize = 10.sp, lineHeight = 14.sp)
                     }
                     3 -> {
-                        SectionHeader("RECENT RESULTS", "Latest result information available from public sources")
-                        data?.previousFixture?.let { previous ->
-                            Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(containerColor = Panel)) {
-                                Column(Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    Text("PREVIOUS LEAGUE MATCH", color = CatRed, fontSize = 11.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 1.4.sp)
-                                    Text(previous, color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold)
-                                    Text(data.previousKickoff ?: "Date unavailable", color = Muted, fontSize = 12.sp)
+                        SectionHeader("RECENT RESULTS", "Completed Sunderland matches · sourced from 11v11 · refreshes every five minutes")
+                        if (recentResults.isEmpty()) {
+                            InfoPanel("Results temporarily unavailable", "The public results archive did not return readable scores. Existing dashboard result details remain available.")
+                            androidx.compose.material3.TextButton(onClick = { leagueRefreshToken++ }) {
+                                Text("Retry results", color = Color(0xFFFF8B93))
+                            }
+                        } else {
+                            val leagueResults = recentResults.filter { it.competition.equals("Premier League", true) }
+                            val cupResults = recentResults.filterNot { it.competition.equals("Premier League", true) }
+                            if (leagueResults.isNotEmpty()) {
+                                SectionHeader("PREMIER LEAGUE", "League results only")
+                                leagueResults.take(6).forEach { result ->
+                                    Card(
+                                        modifier = Modifier.fillMaxWidth().clickable {
+                                            context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(result.url)))
+                                        },
+                                        shape = RoundedCornerShape(14.dp),
+                                        colors = CardDefaults.cardColors(containerColor = Panel)
+                                    ) {
+                                        Row(Modifier.fillMaxWidth().padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+                                            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                                Text(result.fixture, color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                                                Text(result.date, color = Muted, fontSize = 11.sp)
+                                            }
+                                            Text(result.score, color = Color(0xFFFFA2A8), fontSize = 18.sp, fontWeight = FontWeight.ExtraBold)
+                                            Spacer(Modifier.width(10.dp))
+                                            Icon(Icons.Filled.OpenInNew, contentDescription = "Open result source", tint = Muted, modifier = Modifier.size(15.dp))
+                                        }
+                                    }
                                 }
                             }
-                        }
-                        data?.previousCupFixture?.let { previous ->
-                            Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(containerColor = Panel)) {
-                                Column(Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    Text("PREVIOUS CUP / EUROPE MATCH", color = CatRed, fontSize = 11.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 1.4.sp)
-                                    Text(previous, color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold)
-                                    Text(data.previousCupKickoff ?: "Date unavailable", color = Muted, fontSize = 12.sp)
+                            if (cupResults.isNotEmpty()) {
+                                SectionHeader("CUPS & EUROPE", "Kept separate from league results")
+                                cupResults.take(6).forEach { result ->
+                                    Card(
+                                        modifier = Modifier.fillMaxWidth().clickable {
+                                            context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(result.url)))
+                                        },
+                                        shape = RoundedCornerShape(14.dp),
+                                        colors = CardDefaults.cardColors(containerColor = Panel)
+                                    ) {
+                                        Row(Modifier.fillMaxWidth().padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+                                            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                                Text(result.fixture, color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                                                Text("${result.competition} · ${result.date}", color = Muted, fontSize = 10.sp, lineHeight = 14.sp)
+                                            }
+                                            Text(result.score, color = Color(0xFFFFA2A8), fontSize = 18.sp, fontWeight = FontWeight.ExtraBold)
+                                            Spacer(Modifier.width(10.dp))
+                                            Icon(Icons.Filled.OpenInNew, contentDescription = "Open result source", tint = Muted, modifier = Modifier.size(15.dp))
+                                        }
+                                    }
                                 }
                             }
+                            Text("Tap a result to open its source. Scorers are shown when supplied by the source; this archive currently provides scores and fixture details.", color = Muted, fontSize = 10.sp, lineHeight = 14.sp)
                         }
-                        if (data?.previousFixture.isNullOrBlank() && data?.previousCupFixture.isNullOrBlank())
-                            InfoPanel("No recent results found", "The app will retry when it refreshes its public sources.")
                     }
                     6 -> {
                         SectionHeader("LOCAL DISCOUNTS & SPONSORS", "Support BlackCat Global and discover local businesses")
