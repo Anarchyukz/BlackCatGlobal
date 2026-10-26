@@ -170,8 +170,8 @@ private suspend fun loadPodcastEpisodes(feed: PodcastFeed): List<PodcastEpisode>
 }
 
 private val CatRed = Color(0xFFE53945)
-private val DeepBackground = Color(0xFF0A0E16)
-private val Panel = Color(0xC91B202A)
+private val DeepBackground = Color.Transparent
+private val Panel = Color(0x801B2636)
 private val Muted = Color(0xFFB7BAC3)
 
 @Composable
@@ -184,7 +184,7 @@ private fun BlackCatAppWithSplash() {
     Box(
         Modifier.fillMaxSize().background(
             androidx.compose.ui.graphics.Brush.linearGradient(
-                listOf(Color(0xFF111827), Color(0xFF090B11), Color(0xFF21131A))
+                listOf(Color(0xFF17283D), Color(0xFF090D17), Color(0xFF291927), Color(0xFF101A2B))
             )
         )
     ) {
@@ -523,10 +523,10 @@ private fun BlackCatApp() {
         }
     }
 
-    Surface(Modifier.fillMaxSize(), color = DeepBackground) {
+    Surface(Modifier.fillMaxSize(), color = Color.Transparent) {
         androidx.compose.material3.Scaffold(
             modifier = Modifier.fillMaxSize().statusBarsPadding(),
-            containerColor = DeepBackground,
+            containerColor = Color.Transparent,
             bottomBar = {
                 androidx.compose.material3.NavigationBar(containerColor = Panel, contentColor = Color.White) {
                     val items = listOf(
@@ -581,7 +581,7 @@ private fun BlackCatApp() {
                     Card(
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(12.dp),
-                        colors = CardDefaults.cardColors(containerColor = Color(0xC8282028))
+                        colors = CardDefaults.cardColors(containerColor = Color(0x78352230))
                     ) {
                         Row(
                             modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp),
