@@ -729,8 +729,8 @@ private fun BlackCatApp() {
                                 }
                                 FixtureMatchup(
                                     fixture = nextSunderlandFixture?.let { scheduled ->
-                                        if (scheduled.venue.equals("Home", true)) "Sunderland vs \${scheduled.opponent}"
-                                        else "\${scheduled.opponent} vs Sunderland"
+                                        if (scheduled.venue.equals("Home", true)) "Sunderland vs ${scheduled.opponent}"
+                                        else "${scheduled.opponent} vs Sunderland"
                                     } ?: if (fixturesLoading || loading) "Finding the next fixture…" else "Fixture details unavailable"
                                 )
                                 Text(
@@ -747,7 +747,7 @@ private fun BlackCatApp() {
                                         Text("WHERE TO WATCH", color = Muted, fontSize = 9.sp, fontWeight = FontWeight.Bold,
                                             letterSpacing = 1.sp)
                                         Text(
-                                            if (channels.isNotEmpty()) "\${channels.size} channel listings found"
+                                            if (channels.isNotEmpty()) "${channels.size} channel listings found"
                                             else if (worldwideSearchLoading || loading) "Checking broadcaster listings…"
                                             else "Broadcast details not confirmed yet",
                                             color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.SemiBold
