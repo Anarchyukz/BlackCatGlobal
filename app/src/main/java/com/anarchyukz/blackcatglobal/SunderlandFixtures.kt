@@ -22,8 +22,11 @@ internal data class SunderlandFixture(
  */
 internal fun loadSunderlandFixtures(): List<SunderlandFixture> {
     val sources = listOf(
+        // Keep general fixture coverage, but query the competition's own match
+        // centre as well so European fixtures are not dependent on club-site scraping.
         "https://www.skysports.com/sunderland-scores-fixtures",
-        "https://www.safc.com/"
+        "https://www.safc.com/",
+        "https://www.uefa.com/uefaeuropaleague/clubs/53360/matches/"
     )
     val now = System.currentTimeMillis()
     val all = sources.flatMap { source ->
